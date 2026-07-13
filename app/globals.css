@@ -32,3 +32,27 @@
     letter-spacing: 0.02em;
   }
 }
+
+@layer components {
+  .train-viewport {
+    overflow: hidden;
+  }
+  .train-track {
+    display: flex;
+    width: 100%;
+    transition: transform 500ms ease;
+  }
+  .train-track > .train-car {
+    flex: 0 0 100%;
+    min-height: 100vh;
+  }
+  /* Запасной режим: обычная вертикаль. */
+  .train-stacked .train-car {
+    min-height: auto;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .train-track {
+      transition: none;
+    }
+  }
+}
