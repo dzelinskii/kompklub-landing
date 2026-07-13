@@ -8,8 +8,8 @@ export function Footer() {
       <div className="max-w-5xl mx-auto grid gap-12 md:grid-cols-2">
         <div className="flex flex-col gap-3">
           <span className="font-display text-3xl text-acid">{siteContent.clubName}</span>
-          <a href={telegram} className="text-muted hover:text-fog">Telegram</a>
-          <a href={vk} className="text-muted hover:text-fog">VK</a>
+          <a href={telegram} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-fog">Telegram</a>
+          <a href={vk} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-fog">VK</a>
           <p className="text-muted">{phone}</p>
           <p className="text-muted">{address}</p>
         </div>
