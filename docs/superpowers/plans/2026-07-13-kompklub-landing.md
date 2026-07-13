@@ -1218,28 +1218,35 @@ import { useCallback, useEffect, useState } from "react";
 
 /** Навигация по вагонам: индекс с зажимом в границах. */
 export function useTrainNavigation(carCount: number) {
+  const count = Math.max(1, carCount); // защита от пустого списка вагонов
   const [index, setIndex] = useState(0);
-  const next = useCallback(() => setIndex((i) => Math.min(i + 1, carCount - 1)), [carCount]);
+  const next = useCallback(() => setIndex((i) => Math.min(i + 1, count - 1)), [count]);
   const prev = useCallback(() => setIndex((i) => Math.max(i - 1, 0)), []);
   const goTo = useCallback(
-    (i: number) => setIndex(Math.max(0, Math.min(i, carCount - 1))),
-    [carCount],
+    (i: number) => setIndex(Math.max(0, Math.min(i, count - 1))),
+    [count],
   );
-  return { index, next, prev, goTo, isFirst: index === 0, isLast: index === carCount - 1 };
+  return { index, next, prev, goTo, isFirst: index === 0, isLast: index === count - 1 };
 }
 
-/** true, если пользователь просит уменьшить движение. Безопасно в SSR/jsdom. */
-export function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
+/**
+ * Компактная раскладка: вертикальный стек вместо горизонтального «поезда».
+ * Включается на узких экранах ИЛИ при prefers-reduced-motion (требование спеки).
+ * Безопасно в SSR/jsdom (там matchMedia нет — возвращаем false).
+ */
+export function useCompactLayout(): boolean {
+  const [compact, setCompact] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setReduced(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
+    const queries = ["(prefers-reduced-motion: reduce)", "(max-width: 767px)"].map((q) =>
+      window.matchMedia(q),
+    );
+    const update = () => setCompact(queries.some((mq) => mq.matches));
+    update();
+    queries.forEach((mq) => mq.addEventListener("change", update));
+    return () => queries.forEach((mq) => mq.removeEventListener("change", update));
   }, []);
-  return reduced;
+  return compact;
 }
 ```
 
@@ -1361,10 +1368,6 @@ export function Door({ open }: { open: boolean }) {
     flex: 0 0 100%;
     min-height: 100vh;
   }
-  /* Запасной режим: обычная вертикаль. */
-  .train-stacked .train-car {
-    min-height: auto;
-  }
   @media (prefers-reduced-motion: reduce) {
     .train-track {
       transition: none;
@@ -1376,7 +1379,7 @@ export function Door({ open }: { open: boolean }) {
 - [ ] **Step 11: Написать тест `components/train/TrainShell.test.tsx`**
 
 ```tsx
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TrainShell } from "./TrainShell";
@@ -1386,6 +1389,8 @@ const cars = [
   { id: "b", label: "Вагон B", content: <p>Контент B</p> },
   { id: "c", label: "Вагон C", content: <p>Контент C</p> },
 ];
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("TrainShell", () => {
   it("держит контент всех вагонов в DOM (важно для SEO)", () => {
@@ -1410,6 +1415,25 @@ describe("TrainShell", () => {
     await userEvent.click(screen.getByRole("button", { name: /следующий вагон/i }));
     expect(screen.getByRole("button", { name: "Вагон 2" })).toHaveAttribute("aria-current", "true");
   });
+
+  it("в компактном режиме показывает вагоны стопкой без индикатора и контролов", () => {
+    // Имитируем узкий экран / reduced-motion: matchMedia сообщает matches=true.
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: true,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+
+    render(<TrainShell mode="teaser" cars={cars} />);
+
+    // Контент всех вагонов всё так же в DOM.
+    expect(screen.getByText("Контент A")).toBeInTheDocument();
+    expect(screen.getByText("Контент C")).toBeInTheDocument();
+    // Индикатор-схема и кнопки перелистывания в компактном режиме не рендерятся.
+    expect(screen.queryByRole("list", { name: /схема поезда/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /следующий вагон/i })).not.toBeInTheDocument();
+  });
 });
 ```
 
@@ -1420,16 +1444,19 @@ Expected: FAIL — модуль не найден.
 
 - [ ] **Step 13: Создать `components/train/TrainShell.tsx`**
 
-Базовая рабочая навигация: клавиатура (стрелки), кнопки «вперёд/назад», клики
-по индикатору. Колесо/свайп добавляются при доводке в браузере (Task 22).
+Базовая рабочая навигация: стрелки ← / → (слушатель на окне, но ввод в полях
+формы не перехватывается), кнопки «вперёд/назад», клики по индикатору.
+Компактная раскладка (узкий экран или reduced-motion) разворачивает вагоны в
+вертикальный стек. Колесо/свайп и тонкая анимация двери — при доводке в
+браузере (Task 22).
 
 ```tsx
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type MouseEvent, type ReactNode } from "react";
 import type { SiteMode } from "@/lib/siteMode";
 import { siteContent } from "@/content/site";
-import { useTrainNavigation, usePrefersReducedMotion } from "@/lib/useTrainNavigation";
+import { useTrainNavigation, useCompactLayout } from "@/lib/useTrainNavigation";
 import { Car } from "./Car";
 import { Door } from "./Door";
 import { TrainProgress } from "./TrainProgress";
@@ -1437,21 +1464,40 @@ import { TrainProgress } from "./TrainProgress";
 export type CarDef = { id: string; label: string; content: ReactNode };
 
 export function TrainShell({ mode, cars }: { mode: SiteMode; cars: CarDef[] }) {
-  const reduced = usePrefersReducedMotion();
+  const compact = useCompactLayout();
   const { index, next, prev, goTo, isFirst, isLast } = useTrainNavigation(cars.length);
+
+  // Навигация стрелками ← / → между вагонами. Слушаем на окне, но пропускаем
+  // ввод в полях формы (иначе стрелки в поле «контакт» дёргали бы поезд и
+  // блокировали курсор). В компактном режиме стрелки не трогаем — там скролл.
+  useEffect(() => {
+    if (compact) return;
+    function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.closest("input, textarea, select") || t.isContentEditable)) return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        next();
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        prev();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [compact, next, prev]);
 
   const cta =
     mode === "teaser"
       ? { label: "Предварительная регистрация", href: "#pre-register" }
       : { label: "Забронировать", href: siteContent.contacts.telegram };
 
-  function onKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+  // В режиме поезда вагон контактов off-screen — переходим к нему навигацией,
+  // а не якорем. В компактном режиме (вертикаль) работает обычный якорь.
+  function onTeaserCtaClick(e: MouseEvent<HTMLAnchorElement>) {
+    if (!compact) {
       e.preventDefault();
-      next();
-    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-      e.preventDefault();
-      prev();
+      goTo(cars.length - 1);
     }
   }
 
@@ -1462,16 +1508,21 @@ export function TrainShell({ mode, cars }: { mode: SiteMode; cars: CarDef[] }) {
   ));
 
   return (
-    <div className={reduced ? "train train-stacked" : "train"} onKeyDown={onKeyDown} tabIndex={0}>
+    <div className={compact ? "train train-stacked" : "train"}>
       <header className="fixed inset-x-0 top-0 z-50 flex items-center justify-between border-b border-line bg-ink/90 px-6 py-4 backdrop-blur">
         <span className="font-display text-2xl text-acid">{siteContent.clubName}</span>
-        {!reduced && <TrainProgress count={cars.length} current={index} onSelect={goTo} />}
-        <a href={cta.href} className="bg-acid px-4 py-2 font-display text-sm uppercase text-ink">
+        {!compact && <TrainProgress count={cars.length} current={index} onSelect={goTo} />}
+        <a
+          href={cta.href}
+          onClick={mode === "teaser" ? onTeaserCtaClick : undefined}
+          {...(mode === "live" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+          className="bg-acid px-4 py-2 font-display text-sm uppercase text-ink"
+        >
           {cta.label}
         </a>
       </header>
 
-      {reduced ? (
+      {compact ? (
         <main>{carEls}</main>
       ) : (
         <main className="train-viewport relative">
@@ -2311,6 +2362,8 @@ Run: `npm run dev`
 Проверить: у всех `img` есть `alt`; поля формы связаны с подписями (клик по подписи фокусирует поле); контраст текста на тёмном/граффити фоне читаем; навигация по Tab доходит до кнопок навигации и формы; переключение вагонов работает с клавиатуры.
 
 Перевод фокуса (реализовать здесь, если ещё не сделано): при переходе в вагон фокус уходит в открытый вагон; при ошибке/успехе отправки формы фокус переводится на сообщение (`role="alert"` уже обеспечивает озвучку ошибки скринридером, фокус усиливает заметность для клавиатурных пользователей).
+
+Индикатор-схема (`TrainProgress`): заменить обобщённые ярлыки кнопок «Вагон N» на осмысленные названия вагонов (метки уже есть в `CarDef.label`) — пробросить `labels` в компонент, чтобы скринридер называл раздел назначения, а не порядковый номер.
 
 - [ ] **Step 5: Commit (если были правки)**
 
