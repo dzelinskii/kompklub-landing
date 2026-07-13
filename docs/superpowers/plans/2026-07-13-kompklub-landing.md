@@ -2388,9 +2388,72 @@ Run: `npm run dev`
 
 Проверить: у всех `img` есть `alt`; поля формы связаны с подписями (клик по подписи фокусирует поле); контраст текста на тёмном/граффити фоне читаем; навигация по Tab доходит до кнопок навигации и формы; переключение вагонов работает с клавиатуры.
 
-Перевод фокуса (реализовать здесь, если ещё не сделано): при переходе в вагон фокус уходит в открытый вагон; при ошибке/успехе отправки формы фокус переводится на сообщение (`role="alert"` уже обеспечивает озвучку ошибки скринридером, фокус усиливает заметность для клавиатурных пользователей).
+**Реализация доступности (код):**
 
-Индикатор-схема (`TrainProgress`): заменить обобщённые ярлыки кнопок «Вагон N» на осмысленные названия вагонов (метки уже есть в `CarDef.label`) — пробросить `labels` в компонент, чтобы скринридер называл раздел назначения, а не порядковый номер.
+1. `components/train/TrainProgress.tsx` — принимать `labels: string[]` вместо `count`, использовать метку вагона как aria-label кнопки:
+```tsx
+export function TrainProgress({
+  labels,
+  current,
+  onSelect,
+}: {
+  labels: string[];
+  current: number;
+  onSelect: (index: number) => void;
+}) {
+  return (
+    <ol className="hidden md:flex items-center gap-2" aria-label="Схема поезда">
+      {labels.map((label, i) => (
+        <li key={i}>
+          <button
+            type="button"
+            aria-label={label}
+            aria-current={i === current ? "true" : undefined}
+            onClick={() => onSelect(i)}
+            className={`block h-1 w-6 ${i === current ? "bg-acid" : "bg-line"}`}
+          />
+        </li>
+      ))}
+    </ol>
+  );
+}
+```
+
+2. `components/train/Car.tsx` — сделать вагон программно фокусируемым (для перевода фокуса при навигации): добавить `tabIndex={-1}` на `<section>`.
+
+3. `components/train/TrainShell.tsx`:
+   - Импортировать `useEffect, useRef` (useEffect уже есть).
+   - Индикатор с метками: `<TrainProgress labels={cars.map((c) => c.label)} current={index} onSelect={goTo} />`.
+   - Ужесточить guard клавиатуры (не падать, если target — не элемент, например window/document):
+```tsx
+    const t = e.target;
+    if (t instanceof Element && (t.closest("input, textarea, select") || (t as HTMLElement).isContentEditable)) return;
+```
+   - Перевод фокуса в активный вагон при навигации (не на первом рендере, не в компактном режиме):
+```tsx
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (compact) return;
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    document
+      .querySelector<HTMLElement>(`[data-car-index="${index}"]`)
+      ?.focus({ preventScroll: true });
+  }, [index, compact]);
+```
+
+4. `components/PreRegisterForm.tsx` — переводить фокус на сообщение о результате:
+   - Импортировать `useEffect, useRef` (дополнительно к useState).
+   - `const msgRef = useRef<HTMLParagraphElement>(null);`
+   - `useEffect(() => { if (status === "success" || status === "error") msgRef.current?.focus(); }, [status]);`
+   - На обоих сообщениях (успех и ошибка) добавить `ref={msgRef} tabIndex={-1}`.
+
+**Обновить тесты:**
+- `components/train/TrainProgress.test.tsx`: передавать `labels={["Начало", "О клубе", "Зоны", "Контакты"]}`; проверять 4 кнопки, `buttons[2]` с `aria-current="true"`, и что у `buttons[2]` доступное имя «Зоны».
+- `components/train/TrainShell.test.tsx`: в тесте «кнопка следующий вагон» метки теперь равны меткам вагонов — после клика проверять кнопку с именем «Вагон B» (второй вагон) вместо «Вагон 2».
+- `components/PreRegisterForm.test.tsx`: добавить тест, что после успешной отправки фокус уходит на сообщение (`document.activeElement` имеет `role="status"`).
 
 - [ ] **Step 5: Commit (если были правки)**
 
