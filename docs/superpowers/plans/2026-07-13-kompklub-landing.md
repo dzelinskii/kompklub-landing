@@ -605,18 +605,16 @@ describe("apiFetch", () => {
     await expect(apiFetch("/ping")).rejects.toThrow(/API_BASE_URL/);
   });
 
-  it("собирает полный URL из базового адреса и пути", async () => {
+  it("собирает полный URL и пробрасывает init в fetch", async () => {
     process.env.NEXT_PUBLIC_API_BASE_URL = "https://api.example.com";
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response("{}", { status: 200 }));
 
-    await apiFetch("/ping");
+    const init = { method: "POST" };
+    await apiFetch("/ping", init);
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.example.com/ping",
-      expect.any(Object),
-    );
+    expect(fetchMock).toHaveBeenCalledWith("https://api.example.com/ping", init);
   });
 });
 ```
