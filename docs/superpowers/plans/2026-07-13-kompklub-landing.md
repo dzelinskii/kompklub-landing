@@ -2424,20 +2424,20 @@ export function TrainProgress({
 3. `components/train/TrainShell.tsx`:
    - Импортировать `useEffect, useRef` (useEffect уже есть).
    - Индикатор с метками: `<TrainProgress labels={cars.map((c) => c.label)} current={index} onSelect={goTo} />`.
-   - Ужесточить guard клавиатуры (не падать, если target — не элемент, например window/document):
+   - Ужесточить guard клавиатуры (не падать на не-HTML target вроде window/document; HTMLElement покрывает поля формы и даёт `isContentEditable` без каста):
 ```tsx
     const t = e.target;
-    if (t instanceof Element && (t.closest("input, textarea, select") || (t as HTMLElement).isContentEditable)) return;
+    if (t instanceof HTMLElement && (t.closest("input, textarea, select") || t.isContentEditable)) return;
 ```
-   - Перевод фокуса в активный вагон при навигации (не на первом рендере, не в компактном режиме):
+   - Перевод фокуса в активный вагон ТОЛЬКО при реальной смене вагона (не на первом рендере, не в компактном режиме, и не при простом переключении compact без смены index — иначе фокус крадётся при ресайзе/повороте):
 ```tsx
-  const firstRender = useRef(true);
+  const prevIndex = useRef(index);
   useEffect(() => {
-    if (compact) return;
-    if (firstRender.current) {
-      firstRender.current = false;
+    if (compact || prevIndex.current === index) {
+      prevIndex.current = index;
       return;
     }
+    prevIndex.current = index;
     document
       .querySelector<HTMLElement>(`[data-car-index="${index}"]`)
       ?.focus({ preventScroll: true });
@@ -2452,7 +2452,7 @@ export function TrainProgress({
 
 **Обновить тесты:**
 - `components/train/TrainProgress.test.tsx`: передавать `labels={["Начало", "О клубе", "Зоны", "Контакты"]}`; проверять 4 кнопки, `buttons[2]` с `aria-current="true"`, и что у `buttons[2]` доступное имя «Зоны».
-- `components/train/TrainShell.test.tsx`: в тесте «кнопка следующий вагон» метки теперь равны меткам вагонов — после клика проверять кнопку с именем «Вагон B» (второй вагон) вместо «Вагон 2».
+- `components/train/TrainShell.test.tsx`: в тесте «кнопка следующий вагон» метки теперь равны меткам вагонов — после клика проверять кнопку с именем «Вагон B» (второй вагон) вместо «Вагон 2». Добавить тест-регрессию на фокус: после клика «следующий вагон» `document.activeElement` имеет `data-car-index="1"`.
 - `components/PreRegisterForm.test.tsx`: добавить тест, что после успешной отправки фокус уходит на сообщение (`document.activeElement` имеет `role="status"`).
 
 - [ ] **Step 5: Commit (если были правки)**
