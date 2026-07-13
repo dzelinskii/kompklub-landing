@@ -9,6 +9,9 @@ export async function sendPreRegisterNotification(input: PreRegisterInput): Prom
 
   const text = `Новая предварительная регистрация\nИмя: ${input.name}\nКонтакт: ${input.contact}`;
 
+  // parse_mode не задаём намеренно: Telegram трактует текст как обычный, без
+  // разбора Markdown/HTML. Это исключает инъекцию разметки из пользовательского
+  // ввода (имя/контакт). Не добавлять parse_mode без экранирования полей.
   const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
