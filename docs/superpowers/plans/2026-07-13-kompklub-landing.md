@@ -1000,6 +1000,11 @@ describe("PreRegisterForm", () => {
 
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(/спасибо/i));
     expect(fetchMock).toHaveBeenCalledWith("/api/pre-register", expect.any(Object));
+    // Проверяем и содержимое запроса: метод и поля тела (иначе переименование
+    // поля не будет поймано тестом).
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init).toMatchObject({ method: "POST" });
+    expect(JSON.parse(String(init?.body))).toMatchObject({ name: "Иван", contact: "@ivan" });
   });
 
   it("показывает ошибку при неуспешном ответе", async () => {
@@ -1010,7 +1015,18 @@ describe("PreRegisterForm", () => {
     await userEvent.type(screen.getByLabelText("Как связаться"), "@ivan");
     await userEvent.click(screen.getByRole("button", { name: /регистрац/i }));
 
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(/ошибка/i));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/ошибка/i));
+  });
+
+  it("показывает ошибку при сбое сети", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+
+    render(<PreRegisterForm />);
+    await userEvent.type(screen.getByLabelText("Имя"), "Иван");
+    await userEvent.type(screen.getByLabelText("Как связаться"), "@ivan");
+    await userEvent.click(screen.getByRole("button", { name: /регистрац/i }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/ошибка/i));
   });
 });
 ```
@@ -1099,7 +1115,7 @@ export function PreRegisterForm() {
         </p>
       )}
       {status === "error" && (
-        <p role="status" className="text-red-400 text-sm">
+        <p role="alert" className="text-red-400 text-sm">
           Ошибка отправки. Попробуйте ещё раз или напишите нам в Telegram.
         </p>
       )}
@@ -2293,6 +2309,8 @@ Run: `npm run dev`
 - [ ] **Step 4: Базовая доступность**
 
 Проверить: у всех `img` есть `alt`; поля формы связаны с подписями (клик по подписи фокусирует поле); контраст текста на тёмном/граффити фоне читаем; навигация по Tab доходит до кнопок навигации и формы; переключение вагонов работает с клавиатуры.
+
+Перевод фокуса (реализовать здесь, если ещё не сделано): при переходе в вагон фокус уходит в открытый вагон; при ошибке/успехе отправки формы фокус переводится на сообщение (`role="alert"` уже обеспечивает озвучку ошибки скринридером, фокус усиливает заметность для клавиатурных пользователей).
 
 - [ ] **Step 5: Commit (если были правки)**
 
