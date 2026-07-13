@@ -35,6 +35,12 @@ describe("TrainShell", () => {
     expect(screen.getByRole("button", { name: "Вагон B" })).toHaveAttribute("aria-current", "true");
   });
 
+  it("при переходе фокус уходит в активный вагон", async () => {
+    render(<TrainShell mode="teaser" cars={cars} />);
+    await userEvent.click(screen.getByRole("button", { name: /следующий вагон/i }));
+    expect(document.activeElement).toHaveAttribute("data-car-index", "1");
+  });
+
   it("в компактном режиме показывает вагоны стопкой без индикатора и контролов", () => {
     // Имитируем узкий экран / reduced-motion: matchMedia сообщает matches=true.
     vi.stubGlobal("matchMedia", (query: string) => ({

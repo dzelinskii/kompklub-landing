@@ -21,7 +21,7 @@ export function TrainShell({ mode, cars }: { mode: SiteMode; cars: CarDef[] }) {
     if (compact) return;
     function onKey(e: KeyboardEvent) {
       const t = e.target;
-      if (t instanceof Element && (t.closest("input, textarea, select") || (t as HTMLElement).isContentEditable)) return;
+      if (t instanceof HTMLElement && (t.closest("input, textarea, select") || t.isContentEditable)) return;
       if (e.key === "ArrowRight") {
         e.preventDefault();
         next();
@@ -35,16 +35,17 @@ export function TrainShell({ mode, cars }: { mode: SiteMode; cars: CarDef[] }) {
   }, [compact, next, prev]);
 
   // Перевод фокуса в активный вагон при навигации: клавиатурная/кнопочная
-  // смена вагона не должна оставлять фокус «в никуда». На первом рендере не
-  // трогаем (иначе фокус уводит со страницы сразу при загрузке); в компактном
-  // режиме (вертикальный стек) — тоже, там уместнее обычный скролл-фокус.
-  const firstRender = useRef(true);
+  // смена вагона не должна оставлять фокус «в никуда». Фокусируем только при
+  // реальной смене вагона (index изменился), иначе смена compact (ресайз,
+  // поворот, reduced-motion) увела бы фокус, хотя вагон тот же. В компактном
+  // режиме (вертикальный стек) фокус не трогаем — там уместнее обычный скролл.
+  const prevIndex = useRef(index);
   useEffect(() => {
-    if (compact) return;
-    if (firstRender.current) {
-      firstRender.current = false;
+    if (compact || prevIndex.current === index) {
+      prevIndex.current = index;
       return;
     }
+    prevIndex.current = index;
     document
       .querySelector<HTMLElement>(`[data-car-index="${index}"]`)
       ?.focus({ preventScroll: true });
