@@ -616,6 +616,26 @@ describe("apiFetch", () => {
 
     expect(fetchMock).toHaveBeenCalledWith("https://api.example.com/ping", init);
   });
+
+  it("склеивает базу и путь ровно одним слэшем", async () => {
+    process.env.NEXT_PUBLIC_API_BASE_URL = "https://api.example.com/";
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+
+    await apiFetch("/ping");
+
+    expect(fetchMock).toHaveBeenCalledWith("https://api.example.com/ping", undefined);
+  });
+
+  it("возвращает ответ, который вернул fetch", async () => {
+    process.env.NEXT_PUBLIC_API_BASE_URL = "https://api.example.com";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("ok", { status: 200 }));
+
+    const res = await apiFetch("/ping");
+
+    expect(await res.text()).toBe("ok");
+  });
 });
 ```
 
@@ -631,13 +651,16 @@ Expected: FAIL — модуль не найден.
  * Изолированный слой запросов к будущему Python-API (Этап 2).
  * Сейчас не вызывается; существует, чтобы адрес API и способ вызова
  * были в одном месте и переход на реальный бэкенд не задел вёрстку.
+ * База и путь склеиваются ровно одним слэшем — независимо от того, есть ли
+ * завершающий слэш у базы и начальный у пути.
  */
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const base = process.env.NEXT_PUBLIC_API_BASE_URL;
   if (!base) {
     throw new Error("NEXT_PUBLIC_API_BASE_URL не задан");
   }
-  return fetch(`${base}${path}`, init);
+  const url = `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+  return fetch(url, init);
 }
 ```
 
