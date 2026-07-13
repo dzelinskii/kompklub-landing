@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Status = "idle" | "loading" | "success" | "error";
 
 export function PreRegisterForm() {
   const [status, setStatus] = useState<Status>("idle");
+  const msgRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (status === "success" || status === "error") msgRef.current?.focus();
+  }, [status]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -69,12 +74,12 @@ export function PreRegisterForm() {
         {status === "loading" ? "Отправляем…" : "Предварительная регистрация"}
       </button>
       {status === "success" && (
-        <p role="status" className="text-acid text-sm">
+        <p ref={msgRef} tabIndex={-1} role="status" className="text-acid text-sm">
           Спасибо! Мы напишем, когда откроемся.
         </p>
       )}
       {status === "error" && (
-        <p role="alert" className="text-red-400 text-sm">
+        <p ref={msgRef} tabIndex={-1} role="alert" className="text-red-400 text-sm">
           Ошибка отправки. Попробуйте ещё раз или напишите нам в Telegram.
         </p>
       )}

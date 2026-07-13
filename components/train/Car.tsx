@@ -13,7 +13,7 @@ export function Car({
   children: ReactNode;
 }) {
   return (
-    <section id={id} aria-label={label} data-car-index={index} className="train-car">
+    <section id={id} aria-label={label} data-car-index={index} tabIndex={-1} className="train-car">
       {children}
     </section>
   );

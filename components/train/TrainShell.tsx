@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
 import type { SiteMode } from "@/lib/siteMode";
 import { siteContent } from "@/content/site";
 import { useTrainNavigation, useCompactLayout } from "@/lib/useTrainNavigation";
@@ -20,8 +20,8 @@ export function TrainShell({ mode, cars }: { mode: SiteMode; cars: CarDef[] }) {
   useEffect(() => {
     if (compact) return;
     function onKey(e: KeyboardEvent) {
-      const t = e.target as HTMLElement | null;
-      if (t && (t.closest("input, textarea, select") || t.isContentEditable)) return;
+      const t = e.target;
+      if (t instanceof Element && (t.closest("input, textarea, select") || (t as HTMLElement).isContentEditable)) return;
       if (e.key === "ArrowRight") {
         e.preventDefault();
         next();
@@ -33,6 +33,22 @@ export function TrainShell({ mode, cars }: { mode: SiteMode; cars: CarDef[] }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [compact, next, prev]);
+
+  // Перевод фокуса в активный вагон при навигации: клавиатурная/кнопочная
+  // смена вагона не должна оставлять фокус «в никуда». На первом рендере не
+  // трогаем (иначе фокус уводит со страницы сразу при загрузке); в компактном
+  // режиме (вертикальный стек) — тоже, там уместнее обычный скролл-фокус.
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (compact) return;
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    document
+      .querySelector<HTMLElement>(`[data-car-index="${index}"]`)
+      ?.focus({ preventScroll: true });
+  }, [index, compact]);
 
   const cta =
     mode === "teaser"
@@ -58,7 +74,9 @@ export function TrainShell({ mode, cars }: { mode: SiteMode; cars: CarDef[] }) {
     <div className={compact ? "train train-stacked" : "train"}>
       <header className="fixed inset-x-0 top-0 z-50 flex items-center justify-between border-b border-line bg-ink/90 px-6 py-4 backdrop-blur">
         <span className="font-display text-2xl text-acid">{siteContent.clubName}</span>
-        {!compact && <TrainProgress count={cars.length} current={index} onSelect={goTo} />}
+        {!compact && (
+          <TrainProgress labels={cars.map((c) => c.label)} current={index} onSelect={goTo} />
+        )}
         <a
           href={cta.href}
           onClick={mode === "teaser" ? onTeaserCtaClick : undefined}

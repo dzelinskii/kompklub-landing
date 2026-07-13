@@ -25,6 +25,17 @@ describe("PreRegisterForm", () => {
     expect(JSON.parse(String(init?.body))).toMatchObject({ name: "Иван", contact: "@ivan" });
   });
 
+  it("после успешной отправки переводит фокус на сообщение о результате", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
+
+    render(<PreRegisterForm />);
+    await userEvent.type(screen.getByLabelText("Имя"), "Иван");
+    await userEvent.type(screen.getByLabelText("Как связаться"), "@ivan");
+    await userEvent.click(screen.getByRole("button", { name: /регистрац/i }));
+
+    await waitFor(() => expect(document.activeElement).toHaveAttribute("role", "status"));
+  });
+
   it("показывает ошибку при неуспешном ответе", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("fail", { status: 500 }));
 

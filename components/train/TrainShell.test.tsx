@@ -32,7 +32,7 @@ describe("TrainShell", () => {
   it("кнопка «следующий вагон» продвигает индикатор", async () => {
     render(<TrainShell mode="teaser" cars={cars} />);
     await userEvent.click(screen.getByRole("button", { name: /следующий вагон/i }));
-    expect(screen.getByRole("button", { name: "Вагон 2" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("button", { name: "Вагон B" })).toHaveAttribute("aria-current", "true");
   });
 
   it("в компактном режиме показывает вагоны стопкой без индикатора и контролов", () => {
