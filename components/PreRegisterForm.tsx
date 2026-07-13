@@ -74,7 +74,7 @@ export function PreRegisterForm() {
         </p>
       )}
       {status === "error" && (
-        <p role="status" className="text-red-400 text-sm">
+        <p role="alert" className="text-red-400 text-sm">
           Ошибка отправки. Попробуйте ещё раз или напишите нам в Telegram.
         </p>
       )}
