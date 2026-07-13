@@ -1,9 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type MouseEvent, type ReactNode } from "react";
 import type { SiteMode } from "@/lib/siteMode";
 import { siteContent } from "@/content/site";
-import { useTrainNavigation, usePrefersReducedMotion } from "@/lib/useTrainNavigation";
+import { useTrainNavigation, useCompactLayout } from "@/lib/useTrainNavigation";
 import { Car } from "./Car";
 import { Door } from "./Door";
 import { TrainProgress } from "./TrainProgress";
@@ -11,21 +11,40 @@ import { TrainProgress } from "./TrainProgress";
 export type CarDef = { id: string; label: string; content: ReactNode };
 
 export function TrainShell({ mode, cars }: { mode: SiteMode; cars: CarDef[] }) {
-  const reduced = usePrefersReducedMotion();
+  const compact = useCompactLayout();
   const { index, next, prev, goTo, isFirst, isLast } = useTrainNavigation(cars.length);
+
+  // Навигация стрелками ← / → между вагонами. Слушаем на окне, но пропускаем
+  // ввод в полях формы (иначе стрелки в поле «контакт» дёргали бы поезд и
+  // блокировали курсор). В компактном режиме стрелки не трогаем — там скролл.
+  useEffect(() => {
+    if (compact) return;
+    function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.closest("input, textarea, select") || t.isContentEditable)) return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        next();
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        prev();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [compact, next, prev]);
 
   const cta =
     mode === "teaser"
       ? { label: "Предварительная регистрация", href: "#pre-register" }
       : { label: "Забронировать", href: siteContent.contacts.telegram };
 
-  function onKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+  // В режиме поезда вагон контактов off-screen — переходим к нему навигацией,
+  // а не якорем. В компактном режиме (вертикаль) работает обычный якорь.
+  function onTeaserCtaClick(e: MouseEvent<HTMLAnchorElement>) {
+    if (!compact) {
       e.preventDefault();
-      next();
-    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-      e.preventDefault();
-      prev();
+      goTo(cars.length - 1);
     }
   }
 
@@ -36,16 +55,21 @@ export function TrainShell({ mode, cars }: { mode: SiteMode; cars: CarDef[] }) {
   ));
 
   return (
-    <div className={reduced ? "train train-stacked" : "train"} onKeyDown={onKeyDown} tabIndex={0}>
+    <div className={compact ? "train train-stacked" : "train"}>
       <header className="fixed inset-x-0 top-0 z-50 flex items-center justify-between border-b border-line bg-ink/90 px-6 py-4 backdrop-blur">
         <span className="font-display text-2xl text-acid">{siteContent.clubName}</span>
-        {!reduced && <TrainProgress count={cars.length} current={index} onSelect={goTo} />}
-        <a href={cta.href} className="bg-acid px-4 py-2 font-display text-sm uppercase text-ink">
+        {!compact && <TrainProgress count={cars.length} current={index} onSelect={goTo} />}
+        <a
+          href={cta.href}
+          onClick={mode === "teaser" ? onTeaserCtaClick : undefined}
+          {...(mode === "live" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+          className="bg-acid px-4 py-2 font-display text-sm uppercase text-ink"
+        >
           {cta.label}
         </a>
       </header>
 
-      {reduced ? (
+      {compact ? (
         <main>{carEls}</main>
       ) : (
         <main className="train-viewport relative">

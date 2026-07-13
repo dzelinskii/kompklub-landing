@@ -46,10 +46,6 @@
     flex: 0 0 100%;
     min-height: 100vh;
   }
-  /* Запасной режим: обычная вертикаль. */
-  .train-stacked .train-car {
-    min-height: auto;
-  }
   @media (prefers-reduced-motion: reduce) {
     .train-track {
       transition: none;

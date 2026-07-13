@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TrainShell } from "./TrainShell";
@@ -8,6 +8,8 @@ const cars = [
   { id: "b", label: "Вагон B", content: <p>Контент B</p> },
   { id: "c", label: "Вагон C", content: <p>Контент C</p> },
 ];
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("TrainShell", () => {
   it("держит контент всех вагонов в DOM (важно для SEO)", () => {
@@ -31,5 +33,24 @@ describe("TrainShell", () => {
     render(<TrainShell mode="teaser" cars={cars} />);
     await userEvent.click(screen.getByRole("button", { name: /следующий вагон/i }));
     expect(screen.getByRole("button", { name: "Вагон 2" })).toHaveAttribute("aria-current", "true");
+  });
+
+  it("в компактном режиме показывает вагоны стопкой без индикатора и контролов", () => {
+    // Имитируем узкий экран / reduced-motion: matchMedia сообщает matches=true.
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: true,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+
+    render(<TrainShell mode="teaser" cars={cars} />);
+
+    // Контент всех вагонов всё так же в DOM.
+    expect(screen.getByText("Контент A")).toBeInTheDocument();
+    expect(screen.getByText("Контент C")).toBeInTheDocument();
+    // Индикатор-схема и кнопки перелистывания в компактном режиме не рендерятся.
+    expect(screen.queryByRole("list", { name: /схема поезда/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /следующий вагон/i })).not.toBeInTheDocument();
   });
 });
