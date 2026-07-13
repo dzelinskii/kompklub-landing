@@ -1521,7 +1521,8 @@ Expected: FAIL — модуль не найден.
 import { useEffect, useState } from "react";
 
 function diff(target: number, now: number) {
-  const ms = Math.max(0, target - now);
+  // Защита от некорректной даты: при NaN показываем нули, а не "NaN".
+  const ms = Number.isNaN(target) ? 0 : Math.max(0, target - now);
   const sec = Math.floor(ms / 1000);
   return {
     days: Math.floor(sec / 86400),
