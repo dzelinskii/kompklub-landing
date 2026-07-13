@@ -2,11 +2,14 @@
  * Изолированный слой запросов к будущему Python-API (Этап 2).
  * Сейчас не вызывается; существует, чтобы адрес API и способ вызова
  * были в одном месте и переход на реальный бэкенд не задел вёрстку.
+ * База и путь склеиваются ровно одним слэшем — независимо от того, есть ли
+ * завершающий слэш у базы и начальный у пути.
  */
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const base = process.env.NEXT_PUBLIC_API_BASE_URL;
   if (!base) {
     throw new Error("NEXT_PUBLIC_API_BASE_URL не задан");
   }
-  return fetch(`${base}${path}`, init);
+  const url = `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+  return fetch(url, init);
 }
