@@ -1588,7 +1588,7 @@ git commit -m "Добавить оболочку-поезд: навигацию,
 
 ```tsx
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import { Countdown } from "./Countdown";
 
 beforeEach(() => vi.useFakeTimers());
@@ -1606,6 +1606,22 @@ describe("Countdown", () => {
     vi.setSystemTime(new Date("2026-09-02T18:00:00+03:00"));
     render(<Countdown targetDate="2026-09-01T18:00:00+03:00" />);
     expect(screen.getByTestId("countdown-days")).toHaveTextContent("0");
+  });
+
+  it("обновляет отсчёт по тику таймера", () => {
+    vi.setSystemTime(new Date("2026-09-01T17:59:57+03:00")); // 3 секунды до цели
+    render(<Countdown targetDate="2026-09-01T18:00:00+03:00" />);
+    expect(screen.getByTestId("countdown-seconds")).toHaveTextContent("3");
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(screen.getByTestId("countdown-seconds")).toHaveTextContent("1");
+  });
+
+  it("при некорректной дате показывает нули, а не NaN", () => {
+    render(<Countdown targetDate="не дата" />);
+    expect(screen.getByTestId("countdown-days")).toHaveTextContent("0");
+    expect(screen.getByTestId("countdown-seconds")).toHaveTextContent("0");
   });
 });
 ```
@@ -1636,9 +1652,13 @@ function diff(target: number, now: number) {
 
 export function Countdown({ targetDate }: { targetDate: string }) {
   const target = new Date(targetDate).getTime();
-  const [left, setLeft] = useState(() => diff(target, Date.now()));
+  // На сервере и при первом рендере клиента показываем детерминированные нули,
+  // реальное значение считаем уже после монтирования — иначе SSR и клиент
+  // разойдутся (гидрационная ошибка на «секундах»).
+  const [left, setLeft] = useState(() => diff(target, target));
 
   useEffect(() => {
+    setLeft(diff(target, Date.now()));
     const id = setInterval(() => setLeft(diff(target, Date.now())), 1000);
     return () => clearInterval(id);
   }, [target]);
@@ -1653,7 +1673,7 @@ export function Countdown({ targetDate }: { targetDate: string }) {
   );
 
   return (
-    <div className="flex gap-6">
+    <div className="flex gap-6" role="group" aria-label="Обратный отсчёт до открытия">
       {cell(left.days, "дней", "countdown-days")}
       {cell(left.hours, "часов", "countdown-hours")}
       {cell(left.minutes, "минут", "countdown-minutes")}
