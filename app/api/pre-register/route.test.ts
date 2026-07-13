@@ -42,4 +42,16 @@ describe("POST /api/pre-register", () => {
     const res = await POST(makeRequest({ name: "Иван", contact: "@ivan" }));
     expect(res.status).toBe(502);
   });
+
+  it("на битый JSON отвечает 400 и не шлёт уведомление", async () => {
+    const spy = vi.spyOn(notify, "sendPreRegisterNotification").mockResolvedValue();
+    const req = new Request("http://localhost/api/pre-register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "не json {",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(spy).not.toHaveBeenCalled();
+  });
 });

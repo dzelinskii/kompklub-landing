@@ -22,7 +22,9 @@ export async function POST(req: Request) {
 
   try {
     await sendPreRegisterNotification(parsed.data);
-  } catch {
+  } catch (err) {
+    // Заявка — единственный канал лидов; не глотаем молча, пишем в лог сервера.
+    console.error("Не удалось отправить уведомление о предрегистрации:", err);
     return NextResponse.json({ error: "notify_failed" }, { status: 502 });
   }
 
