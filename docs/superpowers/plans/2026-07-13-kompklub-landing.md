@@ -42,7 +42,7 @@ lib/
 content/
   types.ts                       — типы контента (SiteContent, Zone, Tariff, ...)
   site.ts                        — данные-заглушки (зоны, тарифы, контакты, дата)
-vitest.config.ts, vitest.setup.ts
+vitest.config.mts, vitest.setup.ts
 package.json, tsconfig.json, next.config.ts, postcss.config.mjs, .env.example
 ```
 
@@ -298,11 +298,16 @@ git commit -m "Подключить Tailwind, дизайн-токены и шр�
 ### Task 3: Настройка Vitest и Testing Library
 
 **Files:**
-- Create: `vitest.config.ts`
+- Create: `vitest.config.mts`
 - Create: `vitest.setup.ts`
 - Create: `lib/smoke.test.ts`
 
-- [ ] **Step 1: Создать `vitest.config.ts`**
+Расширение `.mts` (а не `.ts`) — чтобы конфиг всегда грузился как ESM: плагин
+`vite-tsconfig-paths` v5 поставляется только в ESM, и при обычном `.ts` без
+`"type": "module"` в package.json он падает при загрузке. `.mts` решает это
+точечно, не меняя семантику модулей всего проекта.
+
+- [ ] **Step 1: Создать `vitest.config.mts`**
 
 ```ts
 import { defineConfig } from "vitest/config";
