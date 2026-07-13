@@ -16,9 +16,13 @@ function diff(target: number, now: number) {
 
 export function Countdown({ targetDate }: { targetDate: string }) {
   const target = new Date(targetDate).getTime();
-  const [left, setLeft] = useState(() => diff(target, Date.now()));
+  // На сервере и при первом рендере клиента показываем детерминированные нули,
+  // реальное значение считаем уже после монтирования — иначе SSR и клиент
+  // разойдутся (гидрационная ошибка на «секундах»).
+  const [left, setLeft] = useState(() => diff(target, target));
 
   useEffect(() => {
+    setLeft(diff(target, Date.now()));
     const id = setInterval(() => setLeft(diff(target, Date.now())), 1000);
     return () => clearInterval(id);
   }, [target]);
@@ -33,7 +37,7 @@ export function Countdown({ targetDate }: { targetDate: string }) {
   );
 
   return (
-    <div className="flex gap-6">
+    <div className="flex gap-6" role="group" aria-label="Обратный отсчёт до открытия">
       {cell(left.days, "дней", "countdown-days")}
       {cell(left.hours, "часов", "countdown-hours")}
       {cell(left.minutes, "минут", "countdown-minutes")}
