@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Собрать одностраничный промо-лендинг компьютерного клуба на Next.js с двумя режимами (тизер/работаем), формой предварительной регистрации и базовым фирменным стилем, готовый принять финальный дизайн из Claude Design.
+**Goal:** Собрать промо-сайт компьютерного клуба в виде «поезда» на Next.js: дискретная навигация «вагон за вагоном» с запасным вертикальным режимом, два режима (тизер/работаем), форма предварительной регистрации и базовый фирменный стиль, готовый принять финальный дизайн из Claude Design.
 
-**Architecture:** Next.js (App Router, TypeScript) как чистый фронтенд + одна serverless-функция (Route Handler) для приёма предрегистраций и отправки их владельцу в Telegram. Контент вынесен в типизированную модель-заглушку, режим сайта управляется переменной окружения. Заложен изолированный слой запросов под будущий Python-API. Базовый визуал (тёмный фон + кислотно-зелёный акцент) задаётся дизайн-токенами; финальный дизайн из Claude Design накладывается в конце.
+**Architecture:** Next.js (App Router, TypeScript) как чистый фронтенд + одна serverless-функция (Route Handler) для приёма предрегистраций и отправки их владельцу в Telegram. Разделы оформлены как вагоны поезда: серверная страница собирает список вагонов, клиентская оболочка `TrainShell` отвечает за навигацию, индикатор и запасной режим; контент всех вагонов присутствует в DOM (SEO). Контент вынесен в типизированную модель-заглушку, режим сайта управляется переменной окружения. Заложен изолированный слой запросов под будущий Python-API. Базовый визуал (тёмный фон + кислотно-зелёный акцент) задаётся дизайн-токенами; финальный дизайн из Claude Design накладывается в конце.
 
 **Tech Stack:** Next.js 15, React 19, TypeScript, Tailwind CSS v4, Zod, Vitest + Testing Library, деплой на Vercel.
 
@@ -15,23 +15,27 @@
 ```
 app/
   layout.tsx                     — корневой layout, шрифты, метаданные, lang="ru"
-  page.tsx                       — лендинг: выбор Hero по режиму + композиция секций
+  page.tsx                       — сборка: TrainShell + вагоны по порядку (Hero по режиму)
   globals.css                    — Tailwind + дизайн-токены (тёмная база, кислотно-зелёный)
   api/pre-register/route.ts      — POST-обработчик предрегистрации
 components/
-  Header.tsx                     — закреплённая шапка, якоря, CTA (зависит от режима)
-  hero/HeroTeaser.tsx            — главный экран режима «тизер»
-  hero/HeroLive.tsx              — главный экран режима «работаем»
+  train/TrainShell.tsx           — оболочка-поезд: навигация, дверь, прогресс, fallback
+  train/Car.tsx                  — семантическая обёртка вагона (section, id, aria)
+  train/TrainProgress.tsx        — индикатор-схема поезда (номера вагонов)
+  train/Door.tsx                 — визуал раздвижной двери между вагонами
+  hero/HeroTeaser.tsx            — вагон 0, режим «тизер» (экстерьер, «Скоро отправление»)
+  hero/HeroLive.tsx              — вагон 0, режим «работаем» («Посадка открыта»)
   hero/Countdown.tsx             — отсчёт до открытия (клиентский компонент)
-  About.tsx                      — блок «О клубе» + преимущества
-  Zones.tsx                      — карточки зон (data-driven)
-  Pricing.tsx                    — тарифы (зависит от режима)
-  Gallery.tsx                    — сетка фото (заглушки)
-  FindUs.tsx                     — адрес, часы, ссылка на Яндекс.Карты
-  Footer.tsx                     — контакты + форма предрегистрации
+  About.tsx                      — вагон 1: «О клубе» + преимущества
+  Zones.tsx                      — вагон 2: карточки зон (data-driven)
+  Pricing.tsx                    — вагон 3: тарифы (зависит от режима)
+  Gallery.tsx                    — вагон 4: сетка фото (заглушки)
+  FindUs.tsx                     — вагон 5: адрес, часы, ссылка на Яндекс.Карты
+  Footer.tsx                     — вагон 6: контакты + форма предрегистрации
   PreRegisterForm.tsx            — клиентская форма предрегистрации
 lib/
   siteMode.ts                    — getSiteMode(): 'teaser' | 'live'
+  useTrainNavigation.ts          — хук навигации по вагонам (индекс, next/prev, reduced-motion)
   api/client.ts                  — заготовка изолированного слоя запросов к будущему API
   preRegister/schema.ts          — Zod-схема + тип PreRegisterInput
   preRegister/notify.ts          — отправка уведомления в Telegram
@@ -42,7 +46,17 @@ vitest.config.ts, vitest.setup.ts
 package.json, tsconfig.json, next.config.ts, postcss.config.mjs, .env.example
 ```
 
-Каждый файл — одна ответственность. Секции разбиты по смыслу, а не по слоям; компоненты берут данные из `content/site.ts`, поэтому правка контента не трогает вёрстку.
+Каждый файл — одна ответственность. Вагоны разбиты по смыслу; компоненты берут
+данные из `content/site.ts`, поэтому правка контента не трогает вёрстку.
+Содержимое вагонов (About/Zones/Pricing/Gallery/FindUs/Footer) не зависит от
+навигации — их можно строить и тестировать независимо от оболочки-поезда.
+
+> **Примечание о пересмотре (концепция сайта-поезда).** Фазы 0–2 (Tasks 1–10:
+> каркас, контент, режим, API-слой, предрегистрация) от концепции не зависят и
+> идут без изменений. Изменилась Фаза 3: вместо «шапка + вертикальные секции»
+> — оболочка-поезд с дискретной навигацией «вагон за вагоном» и запасным
+> вертикальным режимом. Точная анимация двери и вид вагонов дорабатываются в
+> браузере и по handoff-бандлу из Claude Design (Task 22).
 
 ---
 
@@ -1068,79 +1082,387 @@ git commit -m "Добавить форму предварительной рег
 
 ---
 
-## Фаза 3. Секции и сборка страницы
+## Фаза 3. Оболочка-поезд и вагоны
 
-Все секции берут данные из `content/site.ts`. Стилизация базовая (тёмный фон + кислотно-зелёный акцент); финальный визуал — Task 22.
+Разделы оформлены как вагоны поезда с дискретной навигацией «вагон за вагоном».
+Содержимое вагонов (Tasks 12–18) не зависит от навигации и берёт данные из
+`content/site.ts`. Оболочка-поезд (Task 11) отвечает за перемещение между
+вагонами, индикатор-схему, клавиатуру и запасной вертикальный режим.
 
-### Task 11: Шапка сайта
+**Про визуал и анимацию.** Базовая стилизация (тёмный фон + кислотно-зелёный)
+и рабочая навигация делаются здесь; точный вид вагонов/двери и тонкая анимация
+дорабатываются в браузере и по handoff-бандлу из Claude Design (Task 22).
+Обязательный инвариант: контент всех вагонов присутствует в DOM по порядку
+(SEO + запасной режим), поэтому тесты проверяют наличие контента и поведение
+навигации, а не пиксели.
+
+### Task 11: Оболочка-поезд (навигация, вагон, индикатор, дверь)
 
 **Files:**
-- Create: `components/Header.tsx`
-- Test: `components/Header.test.tsx`
+- Create: `lib/useTrainNavigation.ts`
+- Create: `components/train/Car.tsx`
+- Create: `components/train/TrainProgress.tsx`
+- Create: `components/train/Door.tsx`
+- Create: `components/train/TrainShell.tsx`
+- Modify: `app/globals.css` (раскладка вагонов/трека)
+- Test: `lib/useTrainNavigation.test.ts`
+- Test: `components/train/TrainProgress.test.tsx`
+- Test: `components/train/TrainShell.test.tsx`
 
-- [ ] **Step 1: Написать тест `components/Header.test.tsx`**
+- [ ] **Step 1: Написать тест `lib/useTrainNavigation.test.ts`**
 
-```tsx
+```ts
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
-import { Header } from "./Header";
+import { renderHook, act } from "@testing-library/react";
+import { useTrainNavigation } from "@/lib/useTrainNavigation";
 
-describe("Header", () => {
-  it("в режиме teaser показывает кнопку предрегистрации", () => {
-    render(<Header mode="teaser" />);
-    expect(screen.getByRole("link", { name: /предварительная регистрация/i })).toBeInTheDocument();
+describe("useTrainNavigation", () => {
+  it("стартует с нулевого вагона", () => {
+    const { result } = renderHook(() => useTrainNavigation(4));
+    expect(result.current.index).toBe(0);
+    expect(result.current.isFirst).toBe(true);
   });
 
-  it("в режиме live показывает кнопку бронирования", () => {
-    render(<Header mode="live" />);
-    expect(screen.getByRole("link", { name: /забронировать/i })).toBeInTheDocument();
+  it("next не выходит за последний вагон", () => {
+    const { result } = renderHook(() => useTrainNavigation(2));
+    act(() => result.current.next());
+    act(() => result.current.next());
+    act(() => result.current.next());
+    expect(result.current.index).toBe(1);
+    expect(result.current.isLast).toBe(true);
+  });
+
+  it("prev не выходит за нулевой вагон", () => {
+    const { result } = renderHook(() => useTrainNavigation(3));
+    act(() => result.current.prev());
+    expect(result.current.index).toBe(0);
+  });
+
+  it("goTo зажимает индекс в границах", () => {
+    const { result } = renderHook(() => useTrainNavigation(3));
+    act(() => result.current.goTo(10));
+    expect(result.current.index).toBe(2);
+    act(() => result.current.goTo(-5));
+    expect(result.current.index).toBe(0);
   });
 });
 ```
 
 - [ ] **Step 2: Запустить тест — убедиться, что падает**
 
-Run: `npm test -- components/Header.test.tsx`
+Run: `npm test -- lib/useTrainNavigation.test.ts`
 Expected: FAIL — модуль не найден.
 
-- [ ] **Step 3: Создать `components/Header.tsx`**
+- [ ] **Step 3: Создать `lib/useTrainNavigation.ts`**
 
-```tsx
-import type { SiteMode } from "@/lib/siteMode";
-import { siteContent } from "@/content/site";
+```ts
+"use client";
 
-export function Header({ mode }: { mode: SiteMode }) {
-  const cta =
-    mode === "teaser"
-      ? { label: "Предварительная регистрация", href: "#pre-register" }
-      : { label: "Забронировать", href: siteContent.contacts.telegram };
+import { useCallback, useEffect, useState } from "react";
 
-  return (
-    <header className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 bg-ink/90 backdrop-blur border-b border-line">
-      <span className="font-display text-2xl text-acid">{siteContent.clubName}</span>
-      <nav className="hidden md:flex gap-6 text-sm text-muted">
-        <a href="#zones" className="hover:text-fog">Зоны</a>
-        <a href="#pricing" className="hover:text-fog">Цены</a>
-        <a href="#find-us" className="hover:text-fog">Как найти</a>
-      </nav>
-      <a href={cta.href} className="bg-acid text-ink font-display uppercase text-sm px-4 py-2">
-        {cta.label}
-      </a>
-    </header>
+/** Навигация по вагонам: индекс с зажимом в границах. */
+export function useTrainNavigation(carCount: number) {
+  const [index, setIndex] = useState(0);
+  const next = useCallback(() => setIndex((i) => Math.min(i + 1, carCount - 1)), [carCount]);
+  const prev = useCallback(() => setIndex((i) => Math.max(i - 1, 0)), []);
+  const goTo = useCallback(
+    (i: number) => setIndex(Math.max(0, Math.min(i, carCount - 1))),
+    [carCount],
   );
+  return { index, next, prev, goTo, isFirst: index === 0, isLast: index === carCount - 1 };
+}
+
+/** true, если пользователь просит уменьшить движение. Безопасно в SSR/jsdom. */
+export function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setReduced(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return reduced;
 }
 ```
 
 - [ ] **Step 4: Запустить тест — убедиться, что проходит**
 
-Run: `npm test -- components/Header.test.tsx`
-Expected: PASS (2 теста).
+Run: `npm test -- lib/useTrainNavigation.test.ts`
+Expected: PASS (4 теста).
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Создать `components/train/Car.tsx`**
+
+```tsx
+import type { ReactNode } from "react";
+
+/** Семантическая обёртка вагона. */
+export function Car({
+  id,
+  label,
+  index,
+  children,
+}: {
+  id: string;
+  label: string;
+  index: number;
+  children: ReactNode;
+}) {
+  return (
+    <section id={id} aria-label={label} data-car-index={index} className="train-car">
+      {children}
+    </section>
+  );
+}
+```
+
+- [ ] **Step 6: Написать тест `components/train/TrainProgress.test.tsx`**
+
+```tsx
+import { describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { TrainProgress } from "./TrainProgress";
+
+describe("TrainProgress", () => {
+  it("рисует кнопку на каждый вагон и помечает текущий", () => {
+    render(<TrainProgress count={4} current={2} onSelect={vi.fn()} />);
+    const buttons = screen.getAllByRole("button");
+    expect(buttons).toHaveLength(4);
+    expect(buttons[2]).toHaveAttribute("aria-current", "true");
+  });
+});
+```
+
+- [ ] **Step 7: Создать `components/train/TrainProgress.tsx`**
+
+```tsx
+/** Индикатор-схема поезда: по метке на каждый вагон, текущий подсвечен. */
+export function TrainProgress({
+  count,
+  current,
+  onSelect,
+}: {
+  count: number;
+  current: number;
+  onSelect: (index: number) => void;
+}) {
+  return (
+    <ol className="hidden md:flex items-center gap-2" aria-label="Схема поезда">
+      {Array.from({ length: count }).map((_, i) => (
+        <li key={i}>
+          <button
+            type="button"
+            aria-label={`Вагон ${i + 1}`}
+            aria-current={i === current ? "true" : undefined}
+            onClick={() => onSelect(i)}
+            className={`block h-1 w-6 ${i === current ? "bg-acid" : "bg-line"}`}
+          />
+        </li>
+      ))}
+    </ol>
+  );
+}
+```
+
+- [ ] **Step 8: Запустить тест — убедиться, что проходит**
+
+Run: `npm test -- components/train/TrainProgress.test.tsx`
+Expected: PASS (1 тест).
+
+- [ ] **Step 9: Создать `components/train/Door.tsx`**
+
+Декоративная раздвижная дверь (визуал дорабатывается в Task 22). Без теста —
+чисто оформление, aria-hidden.
+
+```tsx
+/** Декоративная дверь-переход между вагонами. */
+export function Door({ open }: { open: boolean }) {
+  return (
+    <div aria-hidden="true" className={`train-door${open ? " train-door--open" : ""}`}>
+      <span className="train-door__leaf train-door__leaf--left" />
+      <span className="train-door__leaf train-door__leaf--right" />
+    </div>
+  );
+}
+```
+
+- [ ] **Step 10: Добавить раскладку в `app/globals.css`**
+
+Добавить в конец файла (базовая геометрия поезда; вид дорабатывается позже):
+
+```css
+@layer components {
+  .train-viewport {
+    overflow: hidden;
+  }
+  .train-track {
+    display: flex;
+    width: 100%;
+    transition: transform 500ms ease;
+  }
+  .train-track > .train-car {
+    flex: 0 0 100%;
+    min-height: 100vh;
+  }
+  /* Запасной режим: обычная вертикаль. */
+  .train-stacked .train-car {
+    min-height: auto;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .train-track {
+      transition: none;
+    }
+  }
+}
+```
+
+- [ ] **Step 11: Написать тест `components/train/TrainShell.test.tsx`**
+
+```tsx
+import { describe, it, expect } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { TrainShell } from "./TrainShell";
+
+const cars = [
+  { id: "a", label: "Вагон A", content: <p>Контент A</p> },
+  { id: "b", label: "Вагон B", content: <p>Контент B</p> },
+  { id: "c", label: "Вагон C", content: <p>Контент C</p> },
+];
+
+describe("TrainShell", () => {
+  it("держит контент всех вагонов в DOM (важно для SEO)", () => {
+    render(<TrainShell mode="teaser" cars={cars} />);
+    expect(screen.getByText("Контент A")).toBeInTheDocument();
+    expect(screen.getByText("Контент B")).toBeInTheDocument();
+    expect(screen.getByText("Контент C")).toBeInTheDocument();
+  });
+
+  it("в режиме teaser показывает кнопку предрегистрации", () => {
+    render(<TrainShell mode="teaser" cars={cars} />);
+    expect(screen.getByRole("link", { name: /предварительная регистрация/i })).toBeInTheDocument();
+  });
+
+  it("в режиме live показывает кнопку бронирования", () => {
+    render(<TrainShell mode="live" cars={cars} />);
+    expect(screen.getByRole("link", { name: /забронировать/i })).toBeInTheDocument();
+  });
+
+  it("кнопка «следующий вагон» продвигает индикатор", async () => {
+    render(<TrainShell mode="teaser" cars={cars} />);
+    await userEvent.click(screen.getByRole("button", { name: /следующий вагон/i }));
+    expect(screen.getByRole("button", { name: "Вагон 2" })).toHaveAttribute("aria-current", "true");
+  });
+});
+```
+
+- [ ] **Step 12: Запустить тест — убедиться, что падает**
+
+Run: `npm test -- components/train/TrainShell.test.tsx`
+Expected: FAIL — модуль не найден.
+
+- [ ] **Step 13: Создать `components/train/TrainShell.tsx`**
+
+Базовая рабочая навигация: клавиатура (стрелки), кнопки «вперёд/назад», клики
+по индикатору. Колесо/свайп добавляются при доводке в браузере (Task 22).
+
+```tsx
+"use client";
+
+import type { ReactNode } from "react";
+import type { SiteMode } from "@/lib/siteMode";
+import { siteContent } from "@/content/site";
+import { useTrainNavigation, usePrefersReducedMotion } from "@/lib/useTrainNavigation";
+import { Car } from "./Car";
+import { Door } from "./Door";
+import { TrainProgress } from "./TrainProgress";
+
+export type CarDef = { id: string; label: string; content: ReactNode };
+
+export function TrainShell({ mode, cars }: { mode: SiteMode; cars: CarDef[] }) {
+  const reduced = usePrefersReducedMotion();
+  const { index, next, prev, goTo, isFirst, isLast } = useTrainNavigation(cars.length);
+
+  const cta =
+    mode === "teaser"
+      ? { label: "Предварительная регистрация", href: "#pre-register" }
+      : { label: "Забронировать", href: siteContent.contacts.telegram };
+
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault();
+      next();
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      prev();
+    }
+  }
+
+  const carEls = cars.map((c, i) => (
+    <Car key={c.id} id={c.id} label={c.label} index={i}>
+      {c.content}
+    </Car>
+  ));
+
+  return (
+    <div className={reduced ? "train train-stacked" : "train"} onKeyDown={onKeyDown} tabIndex={0}>
+      <header className="fixed inset-x-0 top-0 z-50 flex items-center justify-between border-b border-line bg-ink/90 px-6 py-4 backdrop-blur">
+        <span className="font-display text-2xl text-acid">{siteContent.clubName}</span>
+        {!reduced && <TrainProgress count={cars.length} current={index} onSelect={goTo} />}
+        <a href={cta.href} className="bg-acid px-4 py-2 font-display text-sm uppercase text-ink">
+          {cta.label}
+        </a>
+      </header>
+
+      {reduced ? (
+        <main>{carEls}</main>
+      ) : (
+        <main className="train-viewport relative">
+          <div className="train-track" style={{ transform: `translateX(-${index * 100}%)` }}>
+            {carEls}
+          </div>
+          <Door open={false} />
+          <div className="train-controls fixed bottom-6 right-6 z-50 flex gap-3">
+            <button
+              type="button"
+              onClick={prev}
+              disabled={isFirst}
+              aria-label="Предыдущий вагон"
+              className="bg-ink-soft px-4 py-2 text-fog disabled:opacity-40"
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              onClick={next}
+              disabled={isLast}
+              aria-label="Следующий вагон"
+              className="bg-acid px-4 py-2 text-ink disabled:opacity-40"
+            >
+              →
+            </button>
+          </div>
+        </main>
+      )}
+    </div>
+  );
+}
+```
+
+- [ ] **Step 14: Запустить тест — убедиться, что проходит**
+
+Run: `npm test -- components/train/TrainShell.test.tsx`
+Expected: PASS (4 теста).
+
+- [ ] **Step 15: Проверить сборку и закоммитить**
+
+Run: `npm run build`
+Expected: сборка успешна.
 
 ```bash
 git add -A
-git commit -m "Добавить шапку сайта"
+git commit -m "Добавить оболочку-поезд: навигацию, вагон, индикатор, дверь"
 ```
 
 ---
@@ -1246,9 +1568,9 @@ import { render, screen } from "@testing-library/react";
 import { HeroTeaser } from "./HeroTeaser";
 
 describe("HeroTeaser", () => {
-  it("показывает заголовок «скоро открытие» и отсчёт", () => {
+  it("показывает заголовок «скоро отправление» и отсчёт", () => {
     render(<HeroTeaser />);
-    expect(screen.getByRole("heading", { name: /скоро открытие/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /скоро отправление/i })).toBeInTheDocument();
     expect(screen.getByTestId("countdown-days")).toBeInTheDocument();
   });
 });
@@ -1268,7 +1590,7 @@ import { Countdown } from "./Countdown";
 export function HeroTeaser() {
   return (
     <section className="min-h-[80vh] flex flex-col justify-center gap-8 px-6 py-20 text-center">
-      <h1 className="text-6xl md:text-8xl text-fog">Скоро открытие</h1>
+      <h1 className="text-6xl md:text-8xl text-fog">Скоро отправление</h1>
       <p className="text-lg text-muted max-w-xl mx-auto">{siteContent.sloganTeaser}</p>
       <div className="flex justify-center">
         <Countdown targetDate={siteContent.openingDate} />
@@ -1316,6 +1638,7 @@ import { siteContent } from "@/content/site";
 export function HeroLive() {
   return (
     <section className="min-h-[80vh] flex flex-col justify-center gap-8 px-6 py-20 text-center">
+      <p className="text-sm uppercase tracking-widest text-acid">Посадка открыта</p>
       <h1 className="text-6xl md:text-8xl text-fog">{siteContent.sloganLive}</h1>
       <p className="text-lg text-muted">Открыто {siteContent.contacts.hours}</p>
       <div className="flex justify-center">
@@ -1448,7 +1771,7 @@ import { siteContent } from "@/content/site";
 
 export function Zones() {
   return (
-    <section id="zones" className="px-6 py-20 max-w-6xl mx-auto scroll-mt-20">
+    <section className="px-6 py-20 max-w-6xl mx-auto">
       <h2 className="text-4xl text-fog mb-10">Зоны</h2>
       <div className="grid gap-6 md:grid-cols-3">
         {siteContent.zones.map((z) => (
@@ -1525,7 +1848,7 @@ export function Pricing({ mode }: { mode: SiteMode }) {
   const hideTariffs = mode === "teaser" && !siteContent.showTariffsInTeaser;
 
   return (
-    <section id="pricing" className="px-6 py-20 max-w-5xl mx-auto scroll-mt-20">
+    <section className="px-6 py-20 max-w-5xl mx-auto">
       <h2 className="text-4xl text-fog mb-10">Цены</h2>
       {hideTariffs ? (
         <p className="text-muted text-lg">Тарифы скоро — следите за открытием.</p>
@@ -1659,7 +1982,7 @@ import { siteContent } from "@/content/site";
 export function FindUs() {
   const { address, hours, yandexMapsUrl } = siteContent.contacts;
   return (
-    <section id="find-us" className="px-6 py-20 max-w-5xl mx-auto scroll-mt-20">
+    <section className="px-6 py-20 max-w-5xl mx-auto">
       <h2 className="text-4xl text-fog mb-10">Как нас найти</h2>
       <div className="border border-line bg-ink-soft p-8 flex flex-col gap-3">
         <p className="text-fog text-xl">{address}</p>
@@ -1786,13 +2109,13 @@ afterEach(() => {
 });
 
 describe("страница лендинга", () => {
-  it("в режиме teaser показывает главный экран «скоро открытие»", () => {
+  it("в режиме teaser показывает вагон-тизер «скоро отправление»", () => {
     delete process.env.SITE_MODE;
     render(<Home />);
-    expect(screen.getByRole("heading", { name: /скоро открытие/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /скоро отправление/i })).toBeInTheDocument();
   });
 
-  it("в режиме live показывает блок зон", () => {
+  it("в режиме live держит вагон «зоны» в DOM", () => {
     process.env.SITE_MODE = "live";
     render(<Home />);
     expect(screen.getByRole("heading", { name: /зоны/i })).toBeInTheDocument();
@@ -1807,9 +2130,13 @@ Expected: FAIL — страница пока выводит «Каркас ра�
 
 - [ ] **Step 3: Обновить `app/page.tsx`**
 
+Страница (серверный компонент) собирает список вагонов и передаёт его в
+клиентскую оболочку `TrainShell`. Hero-вагон выбирается по режиму. Все вагоны
+попадают в DOM по порядку (важно для SEO и запасного режима).
+
 ```tsx
 import { getSiteMode } from "@/lib/siteMode";
-import { Header } from "@/components/Header";
+import { TrainShell, type CarDef } from "@/components/train/TrainShell";
 import { HeroTeaser } from "@/components/hero/HeroTeaser";
 import { HeroLive } from "@/components/hero/HeroLive";
 import { About } from "@/components/About";
@@ -1821,20 +2148,18 @@ import { Footer } from "@/components/Footer";
 
 export default function Home() {
   const mode = getSiteMode();
-  return (
-    <>
-      <Header mode={mode} />
-      <main>
-        {mode === "teaser" ? <HeroTeaser /> : <HeroLive />}
-        <About />
-        <Zones />
-        <Pricing mode={mode} />
-        <Gallery />
-        <FindUs />
-      </main>
-      <Footer />
-    </>
-  );
+
+  const cars: CarDef[] = [
+    { id: "hero", label: "Начало", content: mode === "teaser" ? <HeroTeaser /> : <HeroLive /> },
+    { id: "about", label: "О клубе", content: <About /> },
+    { id: "zones", label: "Зоны", content: <Zones /> },
+    { id: "pricing", label: "Цены", content: <Pricing mode={mode} /> },
+    { id: "gallery", label: "Галерея", content: <Gallery /> },
+    { id: "find-us", label: "Как найти", content: <FindUs /> },
+    { id: "contacts", label: "Контакты", content: <Footer /> },
+  ];
+
+  return <TrainShell mode={mode} cars={cars} />;
 }
 ```
 
@@ -1914,17 +2239,21 @@ git commit -m "Добавить SEO-метаданные"
 - [ ] **Step 1: Запустить дев-сервер и проверить мобильный вид**
 
 Run: `npm run dev`
-В браузере включить эмуляцию мобильного (375px). Проверить: шапка не ломается, секции читаемы, сетки перестраиваются в один столбец, кнопки не обрезаны.
+В браузере включить эмуляцию мобильного (375px). Проверить: шапка не ломается, вагоны читаемы, сетки перестраиваются в один столбец, кнопки не обрезаны.
 
-- [ ] **Step 2: Проверить оба режима**
+- [ ] **Step 2: Проверить навигацию по вагонам и запасной режим**
 
-Перезапустить с `SITE_MODE=live npm run dev` и убедиться, что главный экран, цены и CTA соответствуют режиму «работаем». Затем вернуть `teaser`.
+На десктопе проверить: кнопки «следующий/предыдущий вагон» и клики по индикатору переключают вагоны; стрелки на клавиатуре тоже. Включить в системе/эмуляции `prefers-reduced-motion: reduce` и убедиться, что сайт разворачивается в обычную вертикаль (вагоны идут стопкой, без горизонтального трека). На мобильном (375px) убедиться, что контент всех вагонов доступен.
 
-- [ ] **Step 3: Базовая доступность**
+- [ ] **Step 3: Проверить оба режима**
 
-Проверить: у всех `img` есть `alt`; поля формы связаны с подписями (клик по подписи фокусирует поле); контраст текста на тёмном фоне читаем; навигация по Tab доходит до кнопок и формы.
+Перезапустить с `SITE_MODE=live npm run dev` и убедиться, что hero-вагон, цены и CTA соответствуют режиму «работаем». Затем вернуть `teaser`.
 
-- [ ] **Step 4: Commit (если были правки)**
+- [ ] **Step 4: Базовая доступность**
+
+Проверить: у всех `img` есть `alt`; поля формы связаны с подписями (клик по подписи фокусирует поле); контраст текста на тёмном/граффити фоне читаем; навигация по Tab доходит до кнопок навигации и формы; переключение вагонов работает с клавиатуры.
+
+- [ ] **Step 5: Commit (если были правки)**
 
 ```bash
 git add -A
@@ -1940,21 +2269,21 @@ git commit -m "Поправить адаптивность и доступнос
 Эта задача выполняется, **когда готовы макеты в Claude Design**. До этого момента лендинг уже функционален с базовым стилем. Здесь throwaway-кода нет — только замена стилевого слоя, структура и логика не меняются.
 
 **Files:**
-- Modify: `app/globals.css` (дизайн-токены: точные цвета, тени/glow, фактуры)
-- Modify: секции в `components/*` (классы стилей, разметка декоративных элементов)
+- Modify: `app/globals.css` (дизайн-токены: точные цвета, тени/glow, фактуры; раскладка/анимация вагонов и двери)
+- Modify: вагоны в `components/*` и оболочку `components/train/*` (классы стилей, декоративные элементы, вид двери/индикатора)
 - Возможно Create: `public/*` (реальные шрифты/ассеты из бандла, если отличаются)
 
 - [ ] **Step 1: Получить handoff-бандл**
 
-В Claude Design завершить макеты (тёмная база + кислотно-зелёный, дозированный glow, граффити-акценты — см. раздел 8 спецификации) и экспортировать handoff-бандл для Claude Code.
+В Claude Design завершить макеты сайта-поезда (экстерьер, вид вагонов, раздвижная граффити-дверь, индикатор-схема; тёмная база + кислотно-зелёный, дозированный glow — см. бриф `docs/superpowers/claude-design-brief.md` и раздел 8 спецификации) и экспортировать handoff-бандл для Claude Code. Здесь же дорабатывается тонкая анимация двери и, при желании, навигация колесом/свайпом поверх готовой клавиатурной и кнопочной.
 
 - [ ] **Step 2: Синхронизировать дизайн-токены**
 
 Перенести точные значения цветов, шрифтов и эффектов из бандла в `@theme` в `app/globals.css`. Компоненты уже используют семантические токены (`bg-ink`, `text-acid` и т.д.), поэтому смена значений применяется глобально.
 
-- [ ] **Step 3: Наложить визуал по секциям**
+- [ ] **Step 3: Наложить визуал по вагонам и оболочке**
 
-Для каждой секции привести классы/разметку к макету (декоративные теги, подтёки, трафаретные разделители). Менять только представление; пропсы и данные из `content/site.ts` не трогать.
+Для каждого вагона и для оболочки-поезда (дверь, индикатор) привести классы/разметку к макету (декоративные теги, подтёки, трафарет, вид двери). Менять только представление; пропсы, данные из `content/site.ts` и логику навигации не трогать.
 
 - [ ] **Step 4: Прогнать тесты — структура не должна сломаться**
 
