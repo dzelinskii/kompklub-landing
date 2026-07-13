@@ -18,4 +18,11 @@ describe("страница лендинга", () => {
     render(<Home />);
     expect(screen.getByRole("heading", { name: /зоны/i })).toBeInTheDocument();
   });
+
+  it("держит все вагоны в DOM в правильном порядке", () => {
+    delete process.env.SITE_MODE;
+    render(<Home />);
+    const ids = Array.from(document.querySelectorAll("[data-car-index]")).map((el) => el.id);
+    expect(ids).toEqual(["hero", "about", "zones", "pricing", "gallery", "find-us", "contacts"]);
+  });
 });
