@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768" viewBox="0 0 1024 768">
+  <!-- Плейсхолдер-граффити для боковой стены. Заменяется на свою картинку:
+       положить PNG/JPG в public/graffiti/ и указать путь в TrainScene. -->
+  <rect width="1024" height="768" fill="#151515"/>
+  <!-- брызги краски -->
+  <g fill="#b6ff1a" opacity="0.14">
+    <circle cx="140" cy="150" r="6"/><circle cx="180" cy="120" r="3"/>
+    <circle cx="900" cy="620" r="8"/><circle cx="860" cy="660" r="4"/>
+    <circle cx="520" cy="90" r="5"/><circle cx="760" cy="200" r="3"/>
+    <circle cx="240" cy="640" r="5"/><circle cx="640" cy="700" r="7"/>
+  </g>
+  <!-- подтёки -->
+  <g fill="#b6ff1a" opacity="0.5">
+    <rect x="330" y="470" width="9" height="120" rx="4"/>
+    <rect x="690" y="480" width="8" height="90" rx="4"/>
+    <rect x="512" y="500" width="10" height="150" rx="5"/>
+  </g>
+  <!-- тень тега -->
+  <text x="524" y="430" font-family="Impact, 'Arial Black', sans-serif" font-size="230"
+        text-anchor="middle" fill="#0a0a0a" transform="rotate(-4 524 430)">RESPAWN</text>
+  <!-- сам тег -->
+  <text x="512" y="420" font-family="Impact, 'Arial Black', sans-serif" font-size="230"
+        text-anchor="middle" fill="#b6ff1a" stroke="#0a0a0a" stroke-width="10"
+        transform="rotate(-4 512 420)">RESPAWN</text>
+  <text x="512" y="560" font-family="'Segoe UI', Arial, sans-serif" font-size="60"
+        font-weight="700" text-anchor="middle" fill="#ededed" letter-spacing="14">PRESS START</text>
+  <rect x="24" y="24" width="976" height="720" fill="none" stroke="#b6ff1a" stroke-width="6" opacity="0.35"/>
+</svg>
