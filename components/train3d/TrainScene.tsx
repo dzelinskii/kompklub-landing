@@ -28,6 +28,7 @@ import { WAGON_PAINTS } from "./wallPaint";
 import { WallTV } from "./WallTV";
 import { NeonSign } from "./NeonSign";
 import { PCSetup } from "./PCSetup";
+import { DriverCabin } from "./DriverCabin";
 
 // Геометрия вагона (переборка на z = i*BAY, см. depthNav).
 const W = 4; // ширина
@@ -1088,6 +1089,8 @@ export default function TrainScene() {
           {WAGONS.map((_, i) => (
             <Bulkhead key={i} index={i} navRef={navRef} />
           ))}
+          {/* «Голова» поезда за вагоном 00 — переборка кабины машиниста */}
+          <DriverCabin z={Z_START + 0.02} w={W} h={H} />
         </Suspense>
         <TunnelTrim />
         <TunnelWindows navRef={navRef} />
