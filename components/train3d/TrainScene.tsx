@@ -29,6 +29,7 @@ import { WallTV } from "./WallTV";
 import { NeonSign } from "./NeonSign";
 import { PCSetup } from "./PCSetup";
 import { DriverCabin } from "./DriverCabin";
+import { TrainBench } from "./TrainBench";
 
 // Геометрия вагона (переборка на z = i*BAY, см. depthNav).
 const W = 4; // ширина
@@ -319,53 +320,18 @@ function Bulkhead({
   );
 }
 
-// Ковшовое сиденье в стиле метро: наклонённая чаша + спинка.
-// back — куда смотрит спинка по оси X (+1 — к правой стене, −1 — к левой).
-function BucketSeat({
-  x,
-  z,
-  back,
-  seatMat,
-}: {
-  x: number;
-  z: number;
-  back: 1 | -1;
-  seatMat: THREE.Material;
-}) {
-  return (
-    <group position={[x, 0, z]} rotation={[0, (back * Math.PI) / 2, 0]}>
-      <mesh position={[0, 0.47, 0]} rotation={[-0.08, 0, 0]} material={seatMat} castShadow>
-        <boxGeometry args={[0.44, 0.05, 0.44]} />
-      </mesh>
-      <mesh position={[0, 0.74, 0.2]} rotation={[0.16, 0, 0]} material={seatMat} castShadow>
-        <boxGeometry args={[0.44, 0.55, 0.05]} />
-      </mesh>
-    </group>
-  );
-}
-
-// Поручни и сиденья по бортам туннеля. Сиденья — посекционно по вагонам, чтобы
-// не пронзать переборки; вместо сплошных лавок — ряды ковшовых сидений на
-// общей раме.
+// Поручни и лавки по бортам туннеля. Лавки — гнутые, «поездного» типа
+// (TrainBench), посекционно по вагонам, чтобы не пронзать переборки.
 function Fixtures() {
   const railMat = useMemo(
     () => new THREE.MeshStandardMaterial({ color: "#7fae12", metalness: 0.7, roughness: 0.35 }),
     [],
   );
-  const seatMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: "#191b1a", metalness: 0.1, roughness: 0.5 }),
-    [],
-  );
-  const frameMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: "#202320", metalness: 0.7, roughness: 0.35 }),
-    [],
-  );
   const bays = Array.from({ length: N }, (_, b) => b);
-  const rowOffsets = [-2.25, -1.35, -0.45, 0.45, 1.35, 2.25]; // 6 мест на вагон
 
   return (
     <group>
-      {/* Правый борт — полный: ряд ковшовых сидений, стойки с кронштейнами,
+      {/* Правый борт — полный: две лавки на вагон, стойки с кронштейнами,
           продольный поручень. */}
       <mesh
         position={[1.6, 2.35, ZC]}
@@ -379,21 +345,11 @@ function Fixtures() {
         const cz = (b - 0.5) * BAY; // центр «комнаты» вагона b
         return (
           <group key={b}>
-            {rowOffsets.map((dz) => (
-              <BucketSeat key={dz} x={1.72} z={cz + dz} back={1} seatMat={seatMat} />
-            ))}
-            {/* рама ряда и опоры */}
-            <mesh position={[1.72, 0.34, cz]} material={frameMat}>
-              <boxGeometry args={[0.42, 0.05, BAY - 2.6]} />
-            </mesh>
-            {[cz - 2, cz, cz + 2].map((lz) => (
-              <mesh key={lz} position={[1.72, 0.17, lz]} material={frameMat}>
-                <boxGeometry args={[0.06, 0.34, 0.06]} />
-              </mesh>
-            ))}
+            <TrainBench length={2.2} position={[1.86, 0, cz - 1.35]} />
+            <TrainBench length={2.2} position={[1.86, 0, cz + 1.35]} />
             {/* стойки: верх точно на высоте продольного поручня, и к нему
                 идёт кронштейн — конструкция читается единым целым */}
-            {[cz - 2.4, cz + 2.4].map((pz) => (
+            {[cz - 2.75, cz + 2.75].map((pz) => (
               <group key={pz}>
                 <mesh position={[1.4, 1.175, pz]} material={railMat} castShadow>
                   <cylinderGeometry args={[0.035, 0.035, 2.35, 10]} />
@@ -411,23 +367,15 @@ function Fixtures() {
           </group>
         );
       })}
-      {/* Левый борт — контентная стена: пара сидений узкой полосой у переборок.
-          На парковке она вне кадра (HTML рисуется поверх сцены и не может быть
-          заслонён), а при довороте в кадре немного объектов. */}
+      {/* Левый борт — контентная стена: короткая лавка узкой полосой у
+          переборок. На парковке она вне кадра (HTML рисуется поверх сцены и не
+          может быть заслонён), а при довороте в кадре немного объектов. */}
       {bays.map((b) => {
         const zb = b * BAY - 1.2; // полоса у переборки вагона b
         return (
           <group key={b}>
-            {[zb - 0.33, zb + 0.33].map((sz) => (
-              <BucketSeat key={sz} x={-1.72} z={sz} back={-1} seatMat={seatMat} />
-            ))}
-            <mesh position={[-1.72, 0.34, zb]} material={frameMat}>
-              <boxGeometry args={[0.42, 0.05, 1.2]} />
-            </mesh>
-            <mesh position={[-1.72, 0.17, zb]} material={frameMat}>
-              <boxGeometry args={[0.06, 0.34, 0.06]} />
-            </mesh>
-            {/* стойка от пола до потолка у края ряда */}
+            <TrainBench length={1.3} position={[-1.86, 0, zb]} rotationY={Math.PI} />
+            {/* стойка от пола до потолка у края лавки */}
             <mesh position={[-1.4, 1.45, b * BAY - 2.05]} material={railMat} castShadow>
               <cylinderGeometry args={[0.035, 0.035, 2.9, 10]} />
             </mesh>
