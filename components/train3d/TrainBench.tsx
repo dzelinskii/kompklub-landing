@@ -81,7 +81,8 @@ export function TrainBench({
   const legZ = [length * 0.25, length * 0.75];
 
   return (
-    <group position={position} rotation={[0, rotationY, 0]}>
+    // name используется экспортом в .glb (см. exportObjectToGlb в TrainScene)
+    <group name="train-bench" position={position} rotation={[0, rotationY, 0]}>
       <group position={[0, 0, -length / 2]}>
         <mesh geometry={pan} material={seatMat} castShadow />
         <mesh geometry={back} material={seatMat} castShadow />

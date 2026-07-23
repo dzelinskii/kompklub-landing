@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, useTexture } from "@react-three/drei";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import * as THREE from "three";
@@ -155,6 +155,48 @@ function CameraRig({
     state.camera.lookAt(tmpT.current);
   });
   return null;
+}
+
+// Даёт доступ к three-сцене снаружи Canvas (для экспорта объектов в .glb).
+function SceneGrabber({
+  sceneRef,
+}: {
+  sceneRef: React.MutableRefObject<THREE.Scene | null>;
+}) {
+  const scene = useThree((s) => s.scene);
+  useEffect(() => {
+    sceneRef.current = scene;
+  }, [scene, sceneRef]);
+  return null;
+}
+
+// Экспорт процедурного объекта сцены в .glb — чтобы дорабатывать модель в
+// Blender (File → Import → glTF 2.0). Ищем объект по имени и скачиваем файл.
+async function exportObjectToGlb(scene: THREE.Scene | null, name: string) {
+  if (!scene) return;
+  const obj = scene.getObjectByName(name);
+  if (!obj) {
+    console.error(`Экспорт .glb: объект «${name}» не найден в сцене`);
+    return;
+  }
+  const { GLTFExporter } = await import(
+    "three/examples/jsm/exporters/GLTFExporter.js"
+  );
+  new GLTFExporter().parse(
+    obj,
+    (result) => {
+      const blob = new Blob([result as ArrayBuffer], {
+        type: "model/gltf-binary",
+      });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${name}.glb`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    },
+    (err) => console.error("Экспорт .glb не удался:", err),
+    { binary: true },
+  );
 }
 
 // Предупреждающие полосы для низа створок — рисуются один раз в текстуру.
@@ -820,6 +862,7 @@ export default function TrainScene() {
   const [speed, setSpeed] = useState<SpeedKey>("Обычно");
   const [mode, setMode] = useState<NavMode>("turn");
   const [htmlMode, setHtmlMode] = useState<HtmlLayerMode>("overlay");
+  const sceneRef = useRef<THREE.Scene | null>(null);
   const navRef = useRef<NavState>({
     cur: 0,
     tgt: 0,
@@ -988,6 +1031,14 @@ export default function TrainScene() {
           ))}
         </nav>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => exportObjectToGlb(sceneRef.current, "train-bench")}
+            className="border border-line bg-ink-soft px-2 py-1.5 text-xs text-fog"
+            title="Скачать лавку как .glb для доработки в Blender"
+          >
+            Лавка → .glb
+          </button>
           <select
             value={htmlMode}
             onChange={(e) => setHtmlMode(e.target.value as HtmlLayerMode)}
@@ -1031,6 +1082,7 @@ export default function TrainScene() {
       >
         {htmlMode === "overlay" && <color attach="background" args={["#050505"]} />}
         <fog attach="fog" args={["#050505", 10, 40]} />
+        <SceneGrabber sceneRef={sceneRef} />
         <Lights navRef={navRef} />
         <Suspense fallback={null}>
           <Tunnel />
