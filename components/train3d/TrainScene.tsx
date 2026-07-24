@@ -29,7 +29,7 @@ import { WallTV } from "./WallTV";
 import { NeonSign } from "./NeonSign";
 import { PCSetup } from "./PCSetup";
 import { DriverCabin } from "./DriverCabin";
-import { TrainBench } from "./TrainBench";
+import { TrainBenchModel } from "./TrainBenchModel";
 
 // Геометрия вагона (переборка на z = i*BAY, см. depthNav).
 const W = 4; // ширина
@@ -387,8 +387,8 @@ function Fixtures() {
         const cz = (b - 0.5) * BAY; // центр «комнаты» вагона b
         return (
           <group key={b}>
-            <TrainBench length={2.2} position={[1.86, 0, cz - 1.35]} />
-            <TrainBench length={2.2} position={[1.86, 0, cz + 1.35]} />
+            <TrainBenchModel position={[1.86, 0, cz - 1.35]} rotationY={-Math.PI / 2} />
+            <TrainBenchModel position={[1.86, 0, cz + 1.35]} rotationY={-Math.PI / 2} />
             {/* стойки: верх точно на высоте продольного поручня, и к нему
                 идёт кронштейн — конструкция читается единым целым */}
             {[cz - 2.75, cz + 2.75].map((pz) => (
@@ -416,7 +416,7 @@ function Fixtures() {
         const zb = b * BAY - 1.2; // полоса у переборки вагона b
         return (
           <group key={b}>
-            <TrainBench length={1.3} position={[-1.86, 0, zb]} rotationY={Math.PI} />
+            <TrainBenchModel position={[-1.86, 0, zb]} rotationY={Math.PI / 2} scaleX={0.6} />
             {/* стойка от пола до потолка у края лавки */}
             <mesh position={[-1.4, 1.45, b * BAY - 2.05]} material={railMat} castShadow>
               <cylinderGeometry args={[0.035, 0.035, 2.9, 10]} />
