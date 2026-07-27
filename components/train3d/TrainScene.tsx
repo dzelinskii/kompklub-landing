@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, useTexture } from "@react-three/drei";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import * as THREE from "three";
@@ -29,6 +29,7 @@ import { WallTV } from "./WallTV";
 import { NeonSign } from "./NeonSign";
 import { PCSetup } from "./PCSetup";
 import { DriverCabin } from "./DriverCabin";
+import { TrainBenchModel } from "./TrainBenchModel";
 
 // Геометрия вагона (переборка на z = i*BAY, см. depthNav).
 const W = 4; // ширина
@@ -154,6 +155,48 @@ function CameraRig({
     state.camera.lookAt(tmpT.current);
   });
   return null;
+}
+
+// Даёт доступ к three-сцене снаружи Canvas (для экспорта объектов в .glb).
+function SceneGrabber({
+  sceneRef,
+}: {
+  sceneRef: React.MutableRefObject<THREE.Scene | null>;
+}) {
+  const scene = useThree((s) => s.scene);
+  useEffect(() => {
+    sceneRef.current = scene;
+  }, [scene, sceneRef]);
+  return null;
+}
+
+// Экспорт процедурного объекта сцены в .glb — чтобы дорабатывать модель в
+// Blender (File → Import → glTF 2.0). Ищем объект по имени и скачиваем файл.
+async function exportObjectToGlb(scene: THREE.Scene | null, name: string) {
+  if (!scene) return;
+  const obj = scene.getObjectByName(name);
+  if (!obj) {
+    console.error(`Экспорт .glb: объект «${name}» не найден в сцене`);
+    return;
+  }
+  const { GLTFExporter } = await import(
+    "three/examples/jsm/exporters/GLTFExporter.js"
+  );
+  new GLTFExporter().parse(
+    obj,
+    (result) => {
+      const blob = new Blob([result as ArrayBuffer], {
+        type: "model/gltf-binary",
+      });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${name}.glb`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    },
+    (err) => console.error("Экспорт .glb не удался:", err),
+    { binary: true },
+  );
 }
 
 // Предупреждающие полосы для низа створок — рисуются один раз в текстуру.
@@ -319,53 +362,18 @@ function Bulkhead({
   );
 }
 
-// Ковшовое сиденье в стиле метро: наклонённая чаша + спинка.
-// back — куда смотрит спинка по оси X (+1 — к правой стене, −1 — к левой).
-function BucketSeat({
-  x,
-  z,
-  back,
-  seatMat,
-}: {
-  x: number;
-  z: number;
-  back: 1 | -1;
-  seatMat: THREE.Material;
-}) {
-  return (
-    <group position={[x, 0, z]} rotation={[0, (back * Math.PI) / 2, 0]}>
-      <mesh position={[0, 0.47, 0]} rotation={[-0.08, 0, 0]} material={seatMat} castShadow>
-        <boxGeometry args={[0.44, 0.05, 0.44]} />
-      </mesh>
-      <mesh position={[0, 0.74, 0.2]} rotation={[0.16, 0, 0]} material={seatMat} castShadow>
-        <boxGeometry args={[0.44, 0.55, 0.05]} />
-      </mesh>
-    </group>
-  );
-}
-
-// Поручни и сиденья по бортам туннеля. Сиденья — посекционно по вагонам, чтобы
-// не пронзать переборки; вместо сплошных лавок — ряды ковшовых сидений на
-// общей раме.
+// Поручни и лавки по бортам туннеля. Лавки — гнутые, «поездного» типа
+// (TrainBench), посекционно по вагонам, чтобы не пронзать переборки.
 function Fixtures() {
   const railMat = useMemo(
     () => new THREE.MeshStandardMaterial({ color: "#7fae12", metalness: 0.7, roughness: 0.35 }),
     [],
   );
-  const seatMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: "#191b1a", metalness: 0.1, roughness: 0.5 }),
-    [],
-  );
-  const frameMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: "#202320", metalness: 0.7, roughness: 0.35 }),
-    [],
-  );
   const bays = Array.from({ length: N }, (_, b) => b);
-  const rowOffsets = [-2.25, -1.35, -0.45, 0.45, 1.35, 2.25]; // 6 мест на вагон
 
   return (
     <group>
-      {/* Правый борт — полный: ряд ковшовых сидений, стойки с кронштейнами,
+      {/* Правый борт — полный: две лавки на вагон, стойки с кронштейнами,
           продольный поручень. */}
       <mesh
         position={[1.6, 2.35, ZC]}
@@ -379,21 +387,11 @@ function Fixtures() {
         const cz = (b - 0.5) * BAY; // центр «комнаты» вагона b
         return (
           <group key={b}>
-            {rowOffsets.map((dz) => (
-              <BucketSeat key={dz} x={1.72} z={cz + dz} back={1} seatMat={seatMat} />
-            ))}
-            {/* рама ряда и опоры */}
-            <mesh position={[1.72, 0.34, cz]} material={frameMat}>
-              <boxGeometry args={[0.42, 0.05, BAY - 2.6]} />
-            </mesh>
-            {[cz - 2, cz, cz + 2].map((lz) => (
-              <mesh key={lz} position={[1.72, 0.17, lz]} material={frameMat}>
-                <boxGeometry args={[0.06, 0.34, 0.06]} />
-              </mesh>
-            ))}
+            <TrainBenchModel position={[1.86, 0, cz - 1.35]} rotationY={-Math.PI / 2} />
+            <TrainBenchModel position={[1.86, 0, cz + 1.35]} rotationY={-Math.PI / 2} />
             {/* стойки: верх точно на высоте продольного поручня, и к нему
                 идёт кронштейн — конструкция читается единым целым */}
-            {[cz - 2.4, cz + 2.4].map((pz) => (
+            {[cz - 2.75, cz + 2.75].map((pz) => (
               <group key={pz}>
                 <mesh position={[1.4, 1.175, pz]} material={railMat} castShadow>
                   <cylinderGeometry args={[0.035, 0.035, 2.35, 10]} />
@@ -411,23 +409,15 @@ function Fixtures() {
           </group>
         );
       })}
-      {/* Левый борт — контентная стена: пара сидений узкой полосой у переборок.
-          На парковке она вне кадра (HTML рисуется поверх сцены и не может быть
-          заслонён), а при довороте в кадре немного объектов. */}
+      {/* Левый борт — контентная стена: короткая лавка узкой полосой у
+          переборок. На парковке она вне кадра (HTML рисуется поверх сцены и не
+          может быть заслонён), а при довороте в кадре немного объектов. */}
       {bays.map((b) => {
         const zb = b * BAY - 1.2; // полоса у переборки вагона b
         return (
           <group key={b}>
-            {[zb - 0.33, zb + 0.33].map((sz) => (
-              <BucketSeat key={sz} x={-1.72} z={sz} back={-1} seatMat={seatMat} />
-            ))}
-            <mesh position={[-1.72, 0.34, zb]} material={frameMat}>
-              <boxGeometry args={[0.42, 0.05, 1.2]} />
-            </mesh>
-            <mesh position={[-1.72, 0.17, zb]} material={frameMat}>
-              <boxGeometry args={[0.06, 0.34, 0.06]} />
-            </mesh>
-            {/* стойка от пола до потолка у края ряда */}
+            <TrainBenchModel position={[-1.86, 0, zb]} rotationY={Math.PI / 2} scaleX={0.6} />
+            {/* стойка от пола до потолка у края лавки */}
             <mesh position={[-1.4, 1.45, b * BAY - 2.05]} material={railMat} castShadow>
               <cylinderGeometry args={[0.035, 0.035, 2.9, 10]} />
             </mesh>
@@ -911,6 +901,7 @@ export default function TrainScene() {
   const [speed, setSpeed] = useState<SpeedKey>("Обычно");
   const [mode, setMode] = useState<NavMode>("turn");
   const [htmlMode, setHtmlMode] = useState<HtmlLayerMode>("overlay");
+  const sceneRef = useRef<THREE.Scene | null>(null);
   const navRef = useRef<NavState>({
     cur: 0,
     tgt: 0,
@@ -1079,6 +1070,14 @@ export default function TrainScene() {
           ))}
         </nav>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => exportObjectToGlb(sceneRef.current, "train-bench")}
+            className="border border-line bg-ink-soft px-2 py-1.5 text-xs text-fog"
+            title="Скачать лавку как .glb для доработки в Blender"
+          >
+            Лавка → .glb
+          </button>
           <select
             value={htmlMode}
             onChange={(e) => setHtmlMode(e.target.value as HtmlLayerMode)}
@@ -1122,6 +1121,7 @@ export default function TrainScene() {
       >
         {htmlMode === "overlay" && <color attach="background" args={["#050505"]} />}
         <fog attach="fog" args={["#050505", 10, 40]} />
+        <SceneGrabber sceneRef={sceneRef} />
         <Lights navRef={navRef} />
         <Suspense fallback={null}>
           <Tunnel />
