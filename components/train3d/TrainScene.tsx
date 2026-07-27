@@ -30,6 +30,7 @@ import { NeonSign } from "./NeonSign";
 import { PCSetup } from "./PCSetup";
 import { DriverCabin } from "./DriverCabin";
 import { TrainBenchModel } from "./TrainBenchModel";
+import { GalleryLightboxes } from "./GalleryLightboxes";
 
 // Геометрия вагона (переборка на z = i*BAY, см. depthNav).
 const W = 4; // ширина
@@ -767,6 +768,31 @@ function WagonPanel({
   );
 }
 
+// Мигающий индикатор «В ПУТИ» рядом с нарисованным табло станции (вагон 06).
+function StationBlink({ position }: { position: [number, number, number] }) {
+  const mat = useRef<THREE.MeshStandardMaterial>(null);
+  const t = useRef(0);
+  useFrame((_, dt) => {
+    t.current += dt;
+    if (mat.current) {
+      mat.current.emissiveIntensity =
+        Math.sin(t.current * 3.4) > 0 ? 1.4 : 0.15;
+    }
+  });
+  return (
+    <mesh position={position}>
+      <boxGeometry args={[0.02, 0.05, 0.05]} />
+      <meshStandardMaterial
+        ref={mat}
+        color="#b6ff1a"
+        emissive="#b6ff1a"
+        emissiveIntensity={1.4}
+        toneMapped={false}
+      />
+    </mesh>
+  );
+}
+
 // «Депо оживает»: освещение по-вагонно. Активен вагон, в котором находится
 // камера; при въезде лампы зажигаются с фликером люминесцентки, покинутый
 // вагон плавно гаснет до дежурного полумрака.
@@ -856,7 +882,7 @@ function BayLights({
         distance={13}
         color="#f2ffd9"
         castShadow
-        shadow-mapSize={[1024, 1024]}
+        shadow-mapSize={[512, 512]}
         shadow-bias={-0.0005}
       />
       <primitive object={target} />
@@ -1134,10 +1160,15 @@ export default function TrainScene() {
         <TunnelTrim />
         <TunnelWindows navRef={navRef} />
         {/* Уникальные объекты вагонов: 00 — экран с видео, 01 — неоновая
-            вывеска, 02 — шоурум ПК-сетапа. Всё в кадре парковки своего вагона. */}
+            вывеска, 02 — шоурум ПК-сетапа, 05 — лайтбоксы галереи, 06 —
+            мигающий индикатор табло. Всё в кадре парковки своего вагона. */}
         <WallTV position={[-W / 2 + 0.1, 1.5, cameraZ(0) + 2]} />
         <NeonSign position={[-W / 2 + 0.09, 1.55, cameraZ(1) + 2.25]} />
         <PCSetup z={cameraZ(2)} />
+        <Suspense fallback={null}>
+          <GalleryLightboxes z={cameraZ(5)} />
+        </Suspense>
+        <StationBlink position={[-W / 2 + 0.06, 2.21, cameraZ(6) - 1.34]} />
         {WAGONS.map((w, i) => (
           <WagonPanel
             key={w.num}
@@ -1146,7 +1177,7 @@ export default function TrainScene() {
             htmlMode={htmlMode}
             visible={current === i && !inTransit}
           >
-            {w.Content({ onDeeper: () => jumpTo(i + 1) })}
+            {w.Content({ onDeeper: () => jumpTo(i + 1), onGoTo: jumpTo })}
           </WagonPanel>
         ))}
         <CameraRig navRef={navRef} onParked={onParked} />
