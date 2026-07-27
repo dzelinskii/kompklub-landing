@@ -447,6 +447,42 @@ function tile(t: THREE.Texture, x: number, y: number, srgb = false) {
   t.needsUpdate = true;
 }
 
+// Свод потолка: пологая арка по ширине (края у стен на baseY, центр приподнят на
+// rise), протянутая на всю длину туннеля — вагон выглядит естественнее плоской
+// крышки. Нормали смотрят вниз, в салон.
+function makeVaultGeometry(
+  width: number,
+  length: number,
+  baseY: number,
+  rise: number,
+  segs: number,
+): THREE.BufferGeometry {
+  const geo = new THREE.BufferGeometry();
+  const pos: number[] = [];
+  const uv: number[] = [];
+  const idx: number[] = [];
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs; // 0..1 по ширине
+    const x = -width / 2 + t * width;
+    const nx = x / (width / 2); // -1..1
+    const y = baseY + rise * Math.cos((nx * Math.PI) / 2); // края→baseY, центр→baseY+rise
+    pos.push(x, y, -length / 2, x, y, length / 2);
+    uv.push(t, 0, t, 1);
+  }
+  for (let i = 0; i < segs; i++) {
+    const a = i * 2,
+      b = i * 2 + 1,
+      c = i * 2 + 2,
+      d = i * 2 + 3;
+    idx.push(a, b, c, c, b, d); // намотка так, чтобы нормаль смотрела вниз
+  }
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  return geo;
+}
+
 // Пол, потолок и боковые стены — сплошной туннель на все вагоны. Материалы —
 // PBR-наборы Poly Haven (CC0): бетонный пол, металлический потолок; на стенах
 // граффити-картинка поверх рельефа металлических панелей.
@@ -474,6 +510,8 @@ function Tunnel() {
   const paints = useMemo(() => WAGON_PAINTS.map((make) => make?.()), []);
   // Рельеф резины для дорожки прохода — свой тайлинг.
   const aisleNor = useMemo(() => floor.normalMap.clone(), [floor.normalMap]);
+  // Свод потолка (пологая арка на всю длину туннеля).
+  const vault = useMemo(() => makeVaultGeometry(W, LEN, H, 0.4, 40), []);
 
   useMemo(() => {
     for (const t of [graffA, graffB]) tile(t, LEN / 4, 1, true);
@@ -519,13 +557,14 @@ function Tunnel() {
           />
         </mesh>
       ))}
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, H, ZC]}>
-        <planeGeometry args={[W, LEN]} />
+      {/* Потолок — свод (пологая арка), а не плоская плита */}
+      <mesh geometry={vault} position={[0, 0, ZC]} receiveShadow>
         <meshStandardMaterial
           map={metal.map}
           normalMap={metal.normalMap}
           roughnessMap={metal.roughnessMap}
           color="#3c3f3c"
+          side={THREE.DoubleSide}
         />
       </mesh>
       <mesh rotation={[0, Math.PI / 2, 0]} position={[-W / 2, H / 2, ZC]} receiveShadow>
